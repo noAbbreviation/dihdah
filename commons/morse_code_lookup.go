@@ -1,6 +1,6 @@
-package cmd
+package commons
 
-var morseCodeLookup = map[rune]string{
+var MorseCodeLookup = map[rune]string{
 	'a': ".,",
 	'b': ",...",
 	'c': ",.,.",

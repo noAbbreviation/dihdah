@@ -1,19 +1,15 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
+	"github.com/noAbbreviation/dihdah/cmd/encode"
 	"github.com/spf13/cobra"
 )
 
 var Cmd = &cobra.Command{
 	Use:   "dihdah",
 	Short: "Drills for learning morse code characters",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Hello from dihdah")
-		return nil
-	},
 }
 
 func Execute() {
@@ -24,19 +20,7 @@ func Execute() {
 }
 
 func init() {
-	Cmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
+	Cmd.CompletionOptions.DisableDefaultCmd = true
 
-type Drill struct {
-	text string
-
-	correct []bool
-	current int
-}
-
-type TrainingModel struct {
-	drills       []Drill
-	currentDrill int
-
-	correct []bool
+	Cmd.AddCommand(encode.Cmd)
 }
