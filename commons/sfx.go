@@ -40,7 +40,7 @@ func init() {
 func initSoundAssets(ditDuration time.Duration) {
 	shortBeepSamples := AudioFormat.SampleRate.N(ditDuration)
 
-	audioTone, err := generators.SawtoothTone(AudioFormat.SampleRate, 1_000)
+	audioTone, err := generators.SineTone(AudioFormat.SampleRate, 1_000)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating the audioTone: %v\n", err)
 		os.Exit(1)
