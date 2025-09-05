@@ -21,7 +21,9 @@ type letterModel struct {
 
 	input        textinput.Model
 	resultsTable table.Model
-	showResults  bool
+
+	showResults bool
+	score       int
 
 	charPlayer chan<- rune
 }
@@ -201,6 +203,7 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				close(_m.charPlayer)
 
 				_m.resultsTable = _m.initResultsTable()
+				_m.score, _ = countCorrectLetters(drill.Text, drill.Correct)
 				_m.showResults = true
 			}
 
@@ -269,9 +272,37 @@ func (_m letterModel) initResultsTable() table.Model {
 	)
 }
 
+func countCorrectLetters(text string, correct []bool) (int, error) {
+	if len([]rune(text)) != len(correct) {
+		return -1, fmt.Errorf("Corrects slice is not equal to length of text.")
+	}
+
+	correctCount := 0
+	for i := 0; i < len(text); i++ {
+		currentChar := rune(text[i])
+		if currentChar < 'a' || currentChar > 'z' {
+			continue
+		}
+
+		if correct[i] {
+			correctCount += 1
+		}
+	}
+
+	return correctCount, nil
+}
+
 func (_m *letterModel) View() string {
 	drill := _m.drill
 	if _m.showResults {
+		iterations := len(drill.Text)
+
+		scoreText := "(all correct!)"
+		if _m.score != iterations {
+			mistakes := len(drill.Text) - _m.score
+			scoreText = fmt.Sprintf("(%v/%v mistakes)", mistakes, iterations)
+		}
+
 		return lipgloss.JoinVertical(
 			lipgloss.Left,
 			fmt.Sprintf(
@@ -282,7 +313,7 @@ func (_m *letterModel) View() string {
 			"",
 			_m.resultsTable.View(),
 			"",
-			"(escape / ctrl+c / enter to go back)",
+			fmt.Sprintf("%v (escape / ctrl+c / enter to go back)", scoreText),
 			"",
 		)
 	}
