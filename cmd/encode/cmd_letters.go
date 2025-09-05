@@ -63,6 +63,16 @@ var LetterCmd = &cobra.Command{
 
 		dedupedLetters := dedupLetters(letters)
 
+		doAllLetters, _ := cmd.Flags().GetBool("recap")
+		if doAllLetters {
+			p := tea.NewProgram(newAllLetterModel(dedupedLetters))
+			if _, err := p.Run(); err != nil {
+				return fmt.Errorf("Error running the program: %v", err)
+			}
+
+			return nil
+		}
+
 		iterations, _ := cmd.Flags().GetUint("iterations")
 		if iterations == 0 {
 			iterations = max(uint(len(dedupedLetters)/2), 3)
@@ -96,6 +106,7 @@ func dedupLetters(str string) string {
 
 func init() {
 	LetterCmd.Flags().UintP("iterations", "n", 0, "Training iterations.")
+	LetterCmd.Flags().BoolP("recap", "a", false, "To train for all letters (in the level if applicable).")
 
 	LetterCmd.Flags().Uint16P("level", "l", 0, fmt.Sprintf(
 		"Level to have for training. Each level adds 3-5 new letters to train. Max level: %v",

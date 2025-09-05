@@ -51,6 +51,25 @@ func newLetterModel(letters string, iterations uint) *letterModel {
 	}
 }
 
+func newAllLetterModel(letters string) *letterModel {
+	drills := &commons.Drill{
+		Text:    letters,
+		Correct: make([]bool, len(letters)),
+	}
+
+	input := textinput.New()
+	input.CharLimit = 32
+	input.Width = 10
+	input.Placeholder = "????"
+	input.Focus()
+
+	return &letterModel{
+		drill:       drills,
+		input:       input,
+		lettersUsed: letters,
+	}
+}
+
 type doneMsg struct{}
 
 func initPlayingMorseCode(speed float64) (tea.Cmd, chan<- rune) {
