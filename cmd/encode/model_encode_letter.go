@@ -2,7 +2,6 @@ package encode
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -28,13 +27,7 @@ type letterModel struct {
 	charPlayer chan<- rune
 }
 
-func newLetterModel(letters string, iterations uint) *letterModel {
-	trainingLetters := ""
-	for range iterations {
-		randomLetter := letters[rand.Intn(len(letters))]
-		trainingLetters += string(randomLetter)
-	}
-
+func newLetterModel(trainingLetters string) *letterModel {
 	drills := &commons.Drill{
 		Text:    trainingLetters,
 		Correct: make([]bool, len(trainingLetters)),
@@ -49,26 +42,7 @@ func newLetterModel(letters string, iterations uint) *letterModel {
 	return &letterModel{
 		drill:       drills,
 		input:       input,
-		lettersUsed: letters,
-	}
-}
-
-func newAllLetterModel(letters string) *letterModel {
-	drills := &commons.Drill{
-		Text:    letters,
-		Correct: make([]bool, len(letters)),
-	}
-
-	input := textinput.New()
-	input.CharLimit = 32
-	input.Width = 10
-	input.Placeholder = "????"
-	input.Focus()
-
-	return &letterModel{
-		drill:       drills,
-		input:       input,
-		lettersUsed: letters,
+		lettersUsed: trainingLetters,
 	}
 }
 

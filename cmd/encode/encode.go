@@ -2,6 +2,7 @@ package encode
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -64,7 +65,7 @@ var Cmd = &cobra.Command{
 
 		doAllLetters, _ := cmd.Flags().GetBool("recap")
 		if doAllLetters {
-			p := tea.NewProgram(newAllLetterModel(dedupedLetters))
+			p := tea.NewProgram(newLetterModel(dedupedLetters))
 			if _, err := p.Run(); err != nil {
 				return fmt.Errorf("Error running the program: %v", err)
 			}
@@ -76,7 +77,14 @@ var Cmd = &cobra.Command{
 		if iterations == 0 {
 			iterations = max(uint(len(dedupedLetters)/2), 3)
 		}
-		p := tea.NewProgram(newLetterModel(dedupedLetters, iterations))
+
+		trainingLetters := ""
+		for range iterations {
+			randomLetter := letters[rand.Intn(len(letters))]
+			trainingLetters += string(randomLetter)
+		}
+
+		p := tea.NewProgram(newLetterModel(trainingLetters))
 
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("Error running the program: %v", err)
