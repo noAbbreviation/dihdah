@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/noAbbreviation/dihdah/cmd/decode"
 	"github.com/noAbbreviation/dihdah/cmd/encode"
 	"github.com/spf13/cobra"
 )
@@ -23,4 +24,5 @@ func init() {
 	Cmd.CompletionOptions.DisableDefaultCmd = true
 
 	Cmd.AddCommand(encode.Cmd)
+	Cmd.AddCommand(decode.Cmd)
 }
