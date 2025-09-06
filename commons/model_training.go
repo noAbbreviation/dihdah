@@ -1,10 +1,10 @@
 package commons
 
 type TrainingModel struct {
-	drills       []Drill
-	currentDrill int
+	Drills       []Drill
+	CurrentDrill int
 
-	correct []bool
+	Correct []bool
 }
 
 type Drill struct {

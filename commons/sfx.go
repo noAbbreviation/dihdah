@@ -95,6 +95,9 @@ func MorseCharSound(str string, speed float64) beep.Streamer {
 			sound = resampledSounds[ShortBeep]
 		case ',':
 			sound = resampledSounds[LongBeep]
+		case ' ', '-':
+			sound = resampledSounds[ShortDelay]
+			loopCount = 3
 		default:
 			continue
 		}

@@ -3,6 +3,7 @@ package decode
 import (
 	"bufio"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 
@@ -20,11 +21,35 @@ var maxWordLenPerLevel = []int{
 	16,
 }
 
+func init() {
+	WordCmd.Flags().Uint16P("iterations", "n", 5, "Training iterations.")
+	WordCmd.Flags().Float64P("speed", "s", 1, "Speed ratio to train with.")
+	WordCmd.Flags().Uint16P("w-length", "m", 0, "Length of maximum word length for training.")
+
+	WordCmd.Flags().Uint16P("level", "l", 0,
+		lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			"Level to have for training. Each level increases the length of the word available,",
+			" so make sure you had finished all levels of 'letters'.",
+			fmt.Sprintf(" Max: %v", len(maxWordLenPerLevel)),
+		),
+	)
+
+	WordCmd.Flags().String("words", "", "Custom word file to train on. You probably should start by using --level.")
+	WordCmd.MarkFlagsOneRequired("level", "words")
+	WordCmd.MarkFlagsMutuallyExclusive("w-length", "level")
+}
+
 var WordCmd = &cobra.Command{
 	Use:     "word",
 	Short:   "Train for decoding words.",
 	Aliases: []string{"words"},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		iterations, _ := cmd.Flags().GetUint16("iterations")
+		if iterations == 0 {
+			return fmt.Errorf("--iterations is set to zero.")
+		}
+
 		levelArg, _ := cmd.Flags().GetUint16("level")
 		wordLength, _ := cmd.Flags().GetUint16("w-length")
 
@@ -42,6 +67,7 @@ var WordCmd = &cobra.Command{
 		}
 
 		wordFile, _ := cmd.Flags().GetString("words")
+
 		if len(wordFile) == 0 {
 			wordFile = defaultWordFile
 		}
@@ -52,14 +78,14 @@ var WordCmd = &cobra.Command{
 		}
 		defer file.Close()
 
-		words := []string(nil)
-
+		wordPool := []string(nil)
 		scanner := bufio.NewScanner(file)
+
 		for scanner.Scan() {
 			word := strings.TrimSpace(scanner.Text())
 
 			if len(word) <= int(wordLength) {
-				words = append(words, word)
+				wordPool = append(wordPool, word)
 			}
 		}
 
@@ -67,34 +93,22 @@ var WordCmd = &cobra.Command{
 			return fmt.Errorf("Error reading through %v: %v", wordFile, err)
 		}
 
-		fmt.Printf("words length: %v\n", len(words))
-		os.Exit(0)
+		words := []string(nil)
+		for range iterations {
+			wordIdx := rand.Intn(len(wordPool))
+			words = append(words, wordPool[wordIdx])
 
-		var model tea.Model
+			wordPool[wordIdx] = wordPool[len(wordPool)-1]
+			wordPool = wordPool[:len(wordPool)-1]
+		}
 
-		p := tea.NewProgram(model)
+		speed, _ := cmd.Flags().GetFloat64("speed")
+		p := tea.NewProgram(newWordModel(words, wordLength, speed))
+
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("Error running the model: %v\n", err)
 		}
 
 		return nil
 	},
-}
-
-func init() {
-	WordCmd.Flags().UintP("iterations", "n", 0, "Training iterations.")
-	WordCmd.Flags().Uint16P("w-length", "m", 0, "Length of maximum word length for training.")
-
-	WordCmd.Flags().Uint16P("level", "l", 0,
-		lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			"Level to have for training. Each level increases the length of the word available,",
-			" so make sure you had finished all levels of 'letters'.",
-			fmt.Sprintf(" Max: %v", len(maxWordLenPerLevel)),
-		),
-	)
-
-	WordCmd.Flags().String("words", "", "Custom word file to train on. You probably should start by using --level.")
-	WordCmd.MarkFlagsOneRequired("level", "words")
-	WordCmd.MarkFlagsMutuallyExclusive("w-length", "level")
 }
