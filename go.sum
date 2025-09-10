@@ -1,3 +1,5 @@
+github.com/Regis24GmbH/go-diacritics v1.0.0 h1:uuJos5zP2NTSw0CWUGxVVBKppJDEBKwxzRLDDSUP/To=
+github.com/Regis24GmbH/go-diacritics v1.0.0/go.mod h1:OnN7PH/WIJrugpbXybxw4DW6lXSjALVr1GtiX2p7QDw=
 github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=
 github.com/atotto/clipboard v0.1.4/go.mod h1:ZY9tmq7sm5xIbd9bOK4onWV4S6X0u6GY7Vn0Yu86PYI=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=

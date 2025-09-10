@@ -20,6 +20,7 @@ const (
 )
 
 const DefaultDitDuration = time.Millisecond * 60
+const MorseSpaceIndicator = '_'
 
 var SoundAssets map[soundType]*beep.Buffer
 
@@ -98,6 +99,11 @@ func MorseCharSound(str string, speed float64) beep.Streamer {
 		case ' ', '-':
 			sound = resampledSounds[ShortDelay]
 			loopCount = 3
+		case MorseSpaceIndicator:
+			sound = resampledSounds[ShortDelay]
+
+			// This is accounting for a space and delaySound before this
+			loopCount = 4
 		default:
 			continue
 		}

@@ -12,4 +12,5 @@ var Cmd = &cobra.Command{
 func init() {
 	Cmd.AddCommand(LetterCmd)
 	Cmd.AddCommand(WordCmd)
+	Cmd.AddCommand(QuoteCmd)
 }
