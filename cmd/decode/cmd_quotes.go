@@ -62,4 +62,42 @@ var QuoteCmd = &cobra.Command{
 
 		return nil
 	},
+	Long: `The 'decode quotes' command gives the user drills to decode sentences.
+The flags should be self-explanatory.
+
+# How it works
+
+You will be given a long sound clip, which is an encoded morse code sentence. Ctrl+l
+will either stop or play the clip. Ctrl+c will either clear your input or go back.
+Ctrl+s will confirm your input.
+
+===========================================================================================
+Decode quote training
+
+┃  1 ?????
+┃
+┃
+┃
+┃
+┃
+
+(ctrl+l to stop/restart playing, ctrl+s to confirm answer, ctrl+c/esc to clear or go back)
+===========================================================================================
+
+At the end of the training session, you will be presented with the correct quote
+played. Use that as learning and/or feedback for the next training session.
+
+=========================================
+Decode quote training results
+
+   Do all things with love. - Og Mandino
+      ?         ?
+>> do nll things_with love    og mandino
+
+(1/28 mistakes) (ctrl+c/esc to go back)
+=========================================
+
+NOTE:
+- For the convenience and challenge, --speed can be used to slow down or speed
+up the sound being played.`,
 }

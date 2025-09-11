@@ -8,13 +8,12 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
 const defaultWordFile = "./assets/words.txt"
 
-var maxWordLenPerLevel = []int{
+var maxWordLenPerLevel = [...]int{
 	5,
 	7,
 	10,
@@ -27,10 +26,8 @@ func init() {
 	WordCmd.Flags().Uint16P("w-length", "m", 0, "Length of maximum word length for training.")
 
 	WordCmd.Flags().Uint16P("level", "l", 0,
-		lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			"Level to have for training. Each level increases the length of the word available,",
-			" so make sure you had finished all levels of 'letters'.",
+		fmt.Sprintf(
+			"Level to have for training. Each level increases the length of the word available.",
 			fmt.Sprintf(" Max: %v", len(maxWordLenPerLevel)),
 		),
 	)
@@ -84,7 +81,7 @@ var WordCmd = &cobra.Command{
 		for scanner.Scan() {
 			word := strings.TrimSpace(scanner.Text())
 
-			if len(word) <= int(wordLength) {
+			if len(word) <= int(wordLength) || int(wordLength) == len(maxWordLenPerLevel) {
 				wordPool = append(wordPool, word)
 			}
 		}
@@ -94,7 +91,7 @@ var WordCmd = &cobra.Command{
 		}
 
 		words := []string(nil)
-		for range iterations {
+		for range min(len(wordPool), int(iterations)) {
 			wordIdx := rand.Intn(len(wordPool))
 			words = append(words, wordPool[wordIdx])
 
@@ -111,4 +108,55 @@ var WordCmd = &cobra.Command{
 
 		return nil
 	},
+	Long: `The 'decode words' command gives the user drills to decode morse code words.
+The flags in this command should be self-explanatory.
+
+# How it works
+
+For each item, you will be given a sound clip to listen. Input the word corresponding
+to the sound. Pressing space or hitting enter when empty will repeat the sound.
+Enter to confirm the answer.
+
+====================================================================
+Decode training (5 letter limit) (1 of 5)
+> egg
+
+(escape/ctrl+c to go back, space to repeat sound, enter to confirm)
+====================================================================
+
+At the end of the training session, you will be presented with the correct words
+together with your input. Use that as learning and/or feedback for the next training session.
+
+================================================================
+Decoding words training results (5 letter limit, 5 iterations):
+
+ #    Word   Correct?  Input
+ 1    egg    yes       egg
+
+ 2    type   no        tove
+                        ??
+ 3    smart  yes       smart
+
+ 4    loose  no        loost
+                           ?
+ 5    part   yes       part
+
+(2/5 mistakes) (escape / ctrl+c / enter to go back)
+================================================================
+
+# Extras
+
+This is the default word length limit if you specify --level/-l:
+    =============================
+    | Level | Word Length Limit |
+    | ----- | ----------------- |
+    | 1     | 5                 |
+    | 2     | 7                 |
+    | 3     | 10                |
+    | 4+    | 16                |
+    =============================
+
+NOTE:
+- For the convenience and the challenge, --speed can be used to slow down or speed
+up the sound being played.`,
 }

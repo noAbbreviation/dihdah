@@ -113,6 +113,59 @@ var LetterCmd = &cobra.Command{
 
 		return nil
 	},
+	Long: `The 'decode letters' command gives the user drills to decode the morse code alphabet.
+The flags in this command should be self-explanatory.
+
+# How it works
+
+For each item, you will be given a sound clip to listen. Input the letter corresponding
+to the sound. Pressing space or hitting enter when empty will repeat the sound.
+Enter to confirm the answer.
+
+====================================================================
+Decode training (3 letters) (1 of 3)
+> t
+
+(escape/ctrl+c to go back, space to repeat sound, enter to confirm)
+====================================================================
+
+
+At the end of the training session, you will be presented with the correct characters
+played. Use that as learning and/or feedback for the next training.
+
+=====================================================
+Decoding training results (3 letters, 3 iterations):
+
+ #    Character   Correct?  Answered
+ 1    t           yes       t
+ 2    e           yes       e
+ 3    e           yes       e
+
+(all correct!) (escape / ctrl+c / enter to go back)
+=====================================================
+
+# Extras
+
+This is the default letter pool if you specify --level/-l:
+    ========================================
+    | Level | Letter Pool                  |
+    | ----- | ---------------------------- |
+    | 1     | the                          |
+    | 2     | thedog                       |
+    | 3     | thedogbrown                  |
+    | 4     | thedogbrownjumps             |
+    | 5     | thedogbrownjumpsfoxover      |
+    | 6     | thedogbrownjumpsfoxoverquick |
+    | 7+    | (everything)                 |
+    ========================================
+
+NOTES:
+  - If the user is having difficulty differentiating letters, it is recommended
+    to run this command with --letters.
+  - After being comfortable with a certain --level, it is also recommended to
+    run --level with --recap before proceeding with the next --level.
+  - For the convenience and the challenge for the user, --speed can be used to
+	slow down or speed up the sound being played.`,
 }
 
 func dedupLetters(str string) string {

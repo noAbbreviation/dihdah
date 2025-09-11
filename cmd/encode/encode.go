@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var newLettersPerLevel = []string{
+var newLettersPerLevel = [...]string{
 	"the",
 	"dog",
 	"brown",
@@ -19,9 +19,23 @@ var newLettersPerLevel = []string{
 	"lazy",
 }
 
+func init() {
+	Cmd.Flags().UintP("iterations", "n", 0, "How many items for the training session.")
+	Cmd.Flags().BoolP("recap", "a", false, "To train for all letters in the letter pool at once.")
+
+	Cmd.Flags().Uint16P("level", "l", 0, fmt.Sprintf(
+		"Level to use for training. Each level adds 3-5 new letters for training. Max level: %v",
+		len(newLettersPerLevel),
+	))
+	Cmd.Flags().String("letters", "", "Custom alphabet pool to train. You probably should start by using --level.")
+
+	Cmd.MarkFlagsOneRequired("level", "letters")
+	Cmd.MarkFlagsMutuallyExclusive("level", "letters")
+}
+
 var Cmd = &cobra.Command{
 	Use:   "encode",
-	Short: "Train for encoding letters.",
+	Short: "Drills for encoding the morse code alphabet.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		detectedNonAlphabet := false
 		letters, _ := cmd.Flags().GetString("letters")
@@ -92,6 +106,60 @@ var Cmd = &cobra.Command{
 
 		return nil
 	},
+	Long: `The encode command gives the user drills to internalize the morse code alphabet.
+The flags in this command should be self-explanatory.
+
+# How it works
+
+For each item, you will be given a letter to encode to morse code. Input the
+corresponding morse code using commas{,} as dashes and periods{.} as dots.
+Enter to confirm the answer.
+
+=============================================
+Encode training (3 letters)
+Letter 'h' (1 of 3)
+> ....
+
+(escape/ctrl+c to go back, enter to confirm)
+=============================================
+
+At the end of the training session, you will be presented with the correct morse
+code characters. Use that as learning and/or feedback for the next training.
+
+====================================================
+Encode training results (3 letters, 3 iterations):
+
+ #    Character   Correct?  Answer
+ 1    h           yes       ....
+ 2    t           yes       ,
+ 3    t           yes       ,
+
+(all correct!) (escape / ctrl+c / enter to go back)
+====================================================
+
+# Extras
+
+The 'encode' command is analogous to 'decode letters', but since the 'encode' command only has
+letter drills, it was decided to only have 'encode'.
+
+This is the default letter pool if you specify --level/-l:
+    ========================================
+    | Level | Letter Pool                  |
+    | ----- | ---------------------------- |
+    | 1     | the                          |
+    | 2     | thedog                       |
+    | 3     | thedogbrown                  |
+    | 4     | thedogbrownjumps             |
+    | 5     | thedogbrownjumpsfoxover      |
+    | 6     | thedogbrownjumpsfoxoverquick |
+    | 7+    | (everything)                 |
+    ========================================
+
+NOTES:
+  - If the user is having difficulty differentiating letters, it is recommended
+    to run this command with --letters.
+  - After being comfortable with a certain --level, it is also recommended to
+    run --level with --recap before proceeding with the next --level.`,
 }
 
 func dedupLetters(str string) string {
@@ -109,17 +177,4 @@ func dedupLetters(str string) string {
 	}
 
 	return letters
-}
-
-func init() {
-	Cmd.Flags().UintP("iterations", "n", 0, "Training iterations.")
-	Cmd.Flags().BoolP("recap", "a", false, "To train for all letters (in the level if applicable).")
-
-	Cmd.Flags().Uint16P("level", "l", 0, fmt.Sprintf(
-		"Level to have for training. Each level adds 3-5 new letters to train. Max level: %v",
-		len(newLettersPerLevel),
-	))
-	Cmd.Flags().String("letters", "", "Custom alphabet pool to train. You probably should start by using --level.")
-
-	Cmd.MarkFlagsOneRequired("level", "letters")
 }
