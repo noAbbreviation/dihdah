@@ -3,15 +3,15 @@ package decode
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/noAbbreviation/dihdah/assets"
 	"github.com/spf13/cobra"
 )
-
-const defaultWordFile = "./assets/words.txt"
 
 var maxWordLenPerLevel = [...]int{
 	5,
@@ -64,19 +64,20 @@ var WordCmd = &cobra.Command{
 		}
 
 		wordFile, _ := cmd.Flags().GetString("words")
+		fileReader := io.Reader(strings.NewReader(assets.Words))
 
-		if len(wordFile) == 0 {
-			wordFile = defaultWordFile
-		}
+		if len(wordFile) != 0 {
+			file, err := os.Open(wordFile)
+			if err != nil {
+				return fmt.Errorf("Error opening %v: %v\n", wordFile, file)
+			}
 
-		file, err := os.Open(wordFile)
-		if err != nil {
-			return fmt.Errorf("Error opening %v: %v\n", wordFile, file)
+			defer file.Close()
+			fileReader = io.Reader(file)
 		}
-		defer file.Close()
 
 		wordPool := []string(nil)
-		scanner := bufio.NewScanner(file)
+		scanner := bufio.NewScanner(fileReader)
 
 		for scanner.Scan() {
 			word := strings.TrimSpace(scanner.Text())
@@ -86,7 +87,7 @@ var WordCmd = &cobra.Command{
 			}
 		}
 
-		if err = scanner.Err(); err != nil {
+		if err := scanner.Err(); err != nil {
 			return fmt.Errorf("Error reading through %v: %v", wordFile, err)
 		}
 

@@ -2,16 +2,17 @@ package decode
 
 import (
 	"bufio"
+	_ "embed"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/noAbbreviation/dihdah/assets"
 	"github.com/spf13/cobra"
 )
-
-const defaultQuotesFile = "./assets/quotes.txt"
 
 func init() {
 	QuoteCmd.Flags().Float64P("speed", "s", 1, "Speed to do the training with.")
@@ -24,20 +25,20 @@ var QuoteCmd = &cobra.Command{
 	Aliases: []string{"quotes"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		quotesFile, _ := cmd.Flags().GetString("quotes")
+		fileReader := io.Reader(strings.NewReader(assets.Quotes))
 
-		if len(quotesFile) == 0 {
-			quotesFile = defaultQuotesFile
+		if len(quotesFile) != 0 {
+			file, err := os.Open(quotesFile)
+			if err != nil {
+				return fmt.Errorf("Error reading %v: %v", quotesFile, err)
+			}
+
+			defer file.Close()
+			fileReader = io.Reader(file)
 		}
-
-		file, err := os.Open(quotesFile)
-		if err != nil {
-			return fmt.Errorf("Error reading %v: %v", quotesFile, err)
-		}
-
-		defer file.Close()
 
 		quotes := []string(nil)
-		scanner := bufio.NewScanner(file)
+		scanner := bufio.NewScanner(fileReader)
 
 		for scanner.Scan() {
 			quote := strings.TrimSpace(scanner.Text())
