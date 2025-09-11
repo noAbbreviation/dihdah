@@ -57,13 +57,6 @@ func newWordModel(words []string, wordLen uint16, speed float64) *wordModel {
 }
 
 func initPlayingMorseCodeWords(speed float64) (tea.Cmd, chan<- string, chan<- struct{}) {
-	delayBuffer := commons.SoundAssets[commons.ShortDelay]
-	delayStreamer := delayBuffer.Streamer(0, delayBuffer.Len())
-	delayResampler := beep.ResampleRatio(4, speed, delayStreamer)
-
-	emptyStreamer := beep.NewBuffer(commons.AudioFormat)
-	emptyStreamer.Append(delayResampler)
-
 	replaySignal := make(chan struct{}, 16)
 	newWord := make(chan string, 16)
 
@@ -77,6 +70,10 @@ func initPlayingMorseCodeWords(speed float64) (tea.Cmd, chan<- string, chan<- st
 			select {
 			case word, ok := <-newWord:
 				if !ok {
+					speaker.Lock()
+					mixer.Clear()
+					speaker.Unlock()
+
 					return doneMsg{}
 				}
 
@@ -87,7 +84,11 @@ func initPlayingMorseCodeWords(speed float64) (tea.Cmd, chan<- string, chan<- st
 					firstRune += 'a' - 'A'
 				}
 
-				morseCode := commons.MorseCodeLookup[firstRune]
+				morseCode := ""
+				if firstRune >= 'a' && firstRune <= 'z' {
+					morseCode += commons.MorseCodeLookup[firstRune]
+				}
+
 				for _, r := range runes[1:] {
 					if r == '-' {
 						morseCode += "-"
@@ -282,7 +283,7 @@ func (_m wordModel) initResultsTable() table.Model {
 		}
 
 		firstRow := table.Row{
-			fmt.Sprint(i),
+			fmt.Sprint(i + 1),
 			drill.Text,
 			correctString,
 			userDisplayedAnswer,

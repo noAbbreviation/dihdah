@@ -49,13 +49,6 @@ func newLetterModel(trainingLetters string) *letterModel {
 type doneMsg struct{}
 
 func initPlayingMorseCode(speed float64) (tea.Cmd, chan<- rune) {
-	delayBuffer := commons.SoundAssets[commons.ShortDelay]
-	delayStreamer := delayBuffer.Streamer(0, delayBuffer.Len())
-	delayResampler := beep.ResampleRatio(4, speed, delayStreamer)
-
-	emptyStreamer := beep.NewBuffer(commons.AudioFormat)
-	emptyStreamer.Append(delayResampler)
-
 	playing := sync.WaitGroup{}
 	chars := make(chan rune, 256)
 
@@ -69,23 +62,13 @@ func initPlayingMorseCode(speed float64) (tea.Cmd, chan<- rune) {
 				playing.Wait()
 				playing.Add(1)
 
-				streamer := emptyStreamer.Streamer(0, emptyStreamer.Len())
-				if c == ' ' {
-					speaker.Play(
-						beep.Seq(
-							beep.Loop(7, streamer),
-							beep.Callback(playing.Done),
-						),
-					)
+				morseCode := commons.MorseCharSound(commons.MorseCodeLookup[c], speed)
+				delayBuffer := commons.SoundAssets[commons.ShortDelay]
 
-					continue
-				}
-
-				morseCode := commons.MorseCodeLookup[c]
 				speaker.Play(
 					beep.Seq(
-						commons.MorseCharSound(morseCode, speed),
-						streamer,
+						morseCode,
+						delayBuffer.Streamer(0, delayBuffer.Len()),
 						beep.Callback(playing.Done),
 					),
 				)

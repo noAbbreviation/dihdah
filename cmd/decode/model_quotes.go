@@ -99,6 +99,10 @@ func initPlayingMorseCodeQuote(quote string, speed float64) (tea.Cmd, chan<- str
 			select {
 			case _, ok := <-toggleSignal:
 				if !ok {
+					speaker.Lock()
+					mixer.Clear()
+					speaker.Unlock()
+
 					return doneMsg{}
 				}
 
@@ -162,8 +166,14 @@ func (_m *quoteModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_m.toggleSignal <- struct{}{}
 			return _m, nil
 		case "ctrl+s":
+			if _m.showResults {
+				return _m, nil
+			}
+
 			_m.displayedResults, _m.corrects, _m.total = InitQuoteTrainingResults(_m.input.Value(), _m.drill.Text)
 			_m.showResults = true
+
+			close(_m.toggleSignal)
 
 			return _m, nil
 		}
@@ -295,7 +305,7 @@ func (_m *quoteModel) View() string {
 
 		return lipgloss.JoinVertical(
 			lipgloss.Left,
-			"Quote training results",
+			"Decode quote training results",
 			"",
 			_m.displayedResults,
 			"",
@@ -306,7 +316,7 @@ func (_m *quoteModel) View() string {
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		"Quote training",
+		"Decode quote training",
 		"",
 		_m.input.View(),
 		"",

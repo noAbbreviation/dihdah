@@ -39,7 +39,14 @@ func init() {
 	speaker.Init(AudioFormat.SampleRate, AudioFormat.SampleRate.N(time.Second/10))
 }
 
+var currentDitDuration = time.Duration(0)
+
 func initSoundAssets(ditDuration time.Duration) {
+	if max(ditDuration, currentDitDuration)-min(ditDuration, currentDitDuration) < time.Millisecond*5 {
+		return
+	}
+
+	currentDitDuration = ditDuration
 	shortBeepSamples := AudioFormat.SampleRate.N(ditDuration)
 
 	audioTone, err := generators.SineTone(AudioFormat.SampleRate, 1_000)
@@ -71,21 +78,9 @@ func initSoundAssets(ditDuration time.Duration) {
 
 func MorseCharSound(str string, speed float64) beep.Streamer {
 	buffer := beep.NewBuffer(AudioFormat)
-	resampledSounds := map[soundType]*beep.Buffer{}
 
-	if speed == 1 {
-		resampledSounds = SoundAssets
-	} else {
-		for _type, oldBuffer := range SoundAssets {
-			streamer := oldBuffer.Streamer(0, oldBuffer.Len())
-			resampler := beep.ResampleRatio(4, speed, streamer)
-
-			newBuffer := beep.NewBuffer(AudioFormat)
-			newBuffer.Append(resampler)
-
-			resampledSounds[_type] = newBuffer
-		}
-	}
+	initSoundAssets(time.Duration(float64(DefaultDitDuration) / speed))
+	resampledSounds := SoundAssets
 
 	for _, r := range str {
 		loopCount := 1

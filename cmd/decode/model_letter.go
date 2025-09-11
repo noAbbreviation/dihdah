@@ -53,13 +53,6 @@ func newLetterModel(trainingLetters string, lettersUsed string, speed float64) *
 type doneMsg struct{}
 
 func initPlayingMorseCode(speed float64) (tea.Cmd, chan<- rune, chan<- struct{}) {
-	delayBuffer := commons.SoundAssets[commons.ShortDelay]
-	delayStreamer := delayBuffer.Streamer(0, delayBuffer.Len())
-	delayResampler := beep.ResampleRatio(4, speed, delayStreamer)
-
-	emptyStreamer := beep.NewBuffer(commons.AudioFormat)
-	emptyStreamer.Append(delayResampler)
-
 	replaySignal := make(chan struct{}, 16)
 	newChar := make(chan rune, 16)
 
