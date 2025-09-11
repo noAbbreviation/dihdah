@@ -3,7 +3,6 @@ package encode
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -167,11 +166,6 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_m.input.Reset()
 			return _m, nil
 		}
-
-	case doneMsg:
-		return _m, tea.Tick(time.Second*3, func(_ time.Time) tea.Msg {
-			return quitMsg{}
-		})
 
 	case quitMsg:
 		return _m, tea.Quit
