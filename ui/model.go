@@ -19,7 +19,6 @@ const (
 
 type dihdahModel struct {
 	// TODO: input reuse
-	inputs       []textinput.Model
 	helpViewPort viewport.Model
 	selected     int
 
