@@ -26,10 +26,8 @@ func init() {
 	WordCmd.Flags().Uint16P("w-length", "m", 0, "Length of maximum word length for training.")
 
 	WordCmd.Flags().Uint16P("level", "l", 0,
-		fmt.Sprintf(
-			"Level to have for training. Each level increases the length of the word available.",
+		"Level to have for training. Each level increases the length of the word available."+
 			fmt.Sprintf(" Max: %v", len(maxWordLenPerLevel)),
-		),
 	)
 
 	WordCmd.Flags().String("words", "", "Custom word file to train on. You probably should start by using --level.")
@@ -74,15 +72,33 @@ var WordCmd = &cobra.Command{
 
 			defer file.Close()
 			fileReader = io.Reader(file)
+		} else {
+			wordFile = "(the default word file)"
 		}
 
 		wordPool := []string(nil)
 		scanner := bufio.NewScanner(fileReader)
 
+		scanner.Split(bufio.ScanWords)
 		for scanner.Scan() {
-			word := strings.TrimSpace(scanner.Text())
+			word := scanner.Text()
+			word = strings.Map(func(r rune) rune {
+				if r >= 'a' && r <= 'z' {
+					return r
+				}
 
-			if len(word) <= int(wordLength) || int(wordLength) == len(maxWordLenPerLevel) {
+				if r >= 'A' && r <= 'Z' {
+					return r
+				}
+
+				if r == '-' {
+					return r
+				}
+
+				return -1
+			}, word)
+
+			if len(word) <= int(wordLength) || int(wordLength) >= len(maxWordLenPerLevel) {
 				wordPool = append(wordPool, word)
 			}
 		}

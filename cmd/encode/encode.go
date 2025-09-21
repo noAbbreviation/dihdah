@@ -42,6 +42,10 @@ var Cmd = &cobra.Command{
 
 		letters = strings.ToLower(letters)
 		letters = strings.Map(func(r rune) rune {
+			if r >= 'A' && r <= 'Z' {
+				return r + ('a' - 'A')
+			}
+
 			if r >= 'a' && r <= 'z' {
 				return r
 			}

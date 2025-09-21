@@ -35,6 +35,8 @@ var QuoteCmd = &cobra.Command{
 
 			defer file.Close()
 			fileReader = io.Reader(file)
+		} else {
+			quotesFile = "(the default quotes file)"
 		}
 
 		quotes := []string(nil)
