@@ -232,6 +232,7 @@ func (_m letterModel) initResultsTable() table.Model {
 		row := table.Row{
 			fmt.Sprint(j),
 			string(currentChar),
+			commons.MorseCodeLookup[currentChar],
 			correctString,
 			string(_m.userAnswers[i]),
 		}
@@ -243,6 +244,7 @@ func (_m letterModel) initResultsTable() table.Model {
 	columns := []table.Column{
 		{Title: "#", Width: 3},
 		{Title: "Character", Width: 10},
+		{Title: "Code", Width: 4},
 		{Title: "Correct?", Width: 8},
 		{Title: "Answered", Width: 8},
 	}
