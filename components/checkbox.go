@@ -50,23 +50,41 @@ func (m *Checkbox) SetUnchecked() {
 	m.checked = false
 }
 
-func (m *Checkbox) Value() bool {
+// Returns a wrapped bool
+func (m *Checkbox) Value() InputValue {
 	return m.checked
+}
+
+func (m *Checkbox) SetValue(checked InputValue) error {
+	value, ok := checked.(bool)
+	if !ok {
+		return InvalidInputErr
+	}
+
+	m.checked = value
+	return nil
 }
 
 func (m *Checkbox) Reset() {
 	m.SetUnchecked()
 }
 
-func (m *Checkbox) Update(msg tea.Msg) (*Checkbox, tea.Cmd) {
+func (m *Checkbox) Init() tea.Cmd {
+	return nil
+}
+
+func (m *Checkbox) Update(msg tea.Msg) (Input, tea.Cmd) {
+	return m.update(msg)
+}
+
+func (m *Checkbox) update(msg tea.Msg) (*Checkbox, tea.Cmd) {
 	if !m.focused {
 		return m, nil
 	}
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case " ", "enter":
+		if msg.String() == " " {
 			m.Toggle()
 		}
 	}

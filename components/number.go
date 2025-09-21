@@ -40,7 +40,7 @@ func abs(f float64) float64 {
 	return -f
 }
 
-func NewNumber(minValue float64, maxValue float64) Number {
+func NewNumber(minValue float64, maxValue float64) *Number {
 	cursor := cursor.New()
 	cursor.SetChar(" ")
 
@@ -52,12 +52,15 @@ func NewNumber(minValue float64, maxValue float64) Number {
 		maxValue = 0
 	}
 
-	_minValue := min(minValue, maxValue)
-	_maxValue := max(minValue, maxValue)
+	if minValue > maxValue {
+		minValue, maxValue = maxValue, minValue
+	}
 
-	return Number{
-		min:             _minValue,
-		max:             _maxValue,
+	return &Number{
+		min:             minValue,
+		max:             maxValue,
+		Default:         minValue,
+		value:           minValue,
 		delta:           1,
 		DecrementSymbol: '<',
 		IncrementSymbol: '>',
@@ -65,31 +68,49 @@ func NewNumber(minValue float64, maxValue float64) Number {
 	}
 }
 
+// Sets to default value
 func (m *Number) Reset() {
-	m.value = m.Default
+	m.SetValue(m.Default)
 }
 
-func (m *Number) SetValue(value float64) {
-	m.value = value
-	m.ClampValue()
-}
-
-func (m Number) Value() float64 {
+// Returns a wrapped float64
+func (m Number) Value() InputValue {
 	return m.value
 }
 
-func (m *Number) ClampValue() {
-	m.value = min(m.max, m.value)
-	if abs(m.max-m.value) < float64_epsilon {
-		m.value = m.max
-		return
+func (m *Number) SetValue(value InputValue) error {
+	num, ok := value.(float64)
+	if !ok {
+		return InvalidInputErr
 	}
 
-	m.value = max(m.min, m.value)
-	if abs(m.min-m.value) < float64_epsilon {
-		m.value = m.min
-		return
+	m.value = num
+	m.ClampValue()
+
+	return nil
+}
+
+func (m *Number) ClampValue() {
+	m.value = clamp(m.value, m.max, m.min)
+}
+
+func clamp(value float64, _max float64, _min float64) float64 {
+	if _max < _min {
+		_min, _max = _max, _min
 	}
+
+	value = min(_max, value)
+	if abs(_max-value) < float64_epsilon {
+		value = _max
+		return value
+	}
+
+	value = max(_min, value)
+	if abs(_min-value) < float64_epsilon {
+		value = _min
+	}
+
+	return value
 }
 
 func (m *Number) Increment() {
@@ -134,7 +155,16 @@ func (m *Number) Focus() tea.Cmd {
 	return m.Cursor.Focus()
 }
 
-func (m *Number) Update(msg tea.Msg) (*Number, tea.Cmd) {
+func (m *Number) Init() tea.Cmd {
+	m.Reset()
+	return nil
+}
+
+func (m *Number) Update(msg tea.Msg) (Input, tea.Cmd) {
+	return m.update(msg)
+}
+
+func (m *Number) update(msg tea.Msg) (*Number, tea.Cmd) {
 	if !m.focused {
 		return m, nil
 	}
@@ -176,13 +206,7 @@ func (m Number) View() string {
 		viewStr += " "
 	}
 
-	viewStr += fmt.Sprintf(" %v", m.value)
-	if m.focused {
-		viewStr += m.Cursor.View()
-	} else {
-		viewStr += " "
-	}
-	viewStr += " "
+	viewStr += fmt.Sprintf("  %v%v ", m.value, m.Cursor.View())
 
 	if m.max > m.value {
 		viewStr += string(m.IncrementSymbol)
