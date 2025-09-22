@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -369,6 +370,8 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "backspace", "esc":
+			// TODO: deal with backspace here
+
 			if _m.currentScreen == mainScreen {
 				return _m, tea.Quit
 			}
@@ -522,7 +525,7 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, _m.navigateUp())
 			uiNavigate = true
 		default:
-			uiScreen, inputMaxIdx := _m.uiMaxIndex(_m.currentScreen)
+			uiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
 			if !uiScreen {
 				break
 			}
@@ -533,8 +536,10 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			switch {
 			default:
-				cmds = append(cmds, tea.Printf("pressed %v", msg.String()))
+				cmds = append(cmds, tea.Printf("pressed '%v'", msg.String()))
 				cmds = append(cmds, tea.Printf("inputI: %v", inputI))
+				cmds = append(cmds, tea.Printf("_m.selected: %v", _m.selected))
+
 				exoticNavigation = false
 
 			case uiScreen && !inputScreen && msg.String() == "j":
@@ -553,12 +558,14 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 
-			focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
-			if _m.selected > inputMaxIdx {
+			inputs := _m.renderedInputIndexes(_m.currentScreen)
+			if _m.selected > inputs[len(inputs)-1] {
 				return _m, tea.Batch(cmds...)
 			}
 
 			var cmd tea.Cmd
+			focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
+
 			switch input := _m.inputs[focusedInputE].(type) {
 			case *components.Number:
 				switch msg.String() {
@@ -602,19 +609,22 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if uiNavigate {
-		for i := range inputMaxIdx {
+		for i := range inputMaxIdx + 1 {
 			inputE := _m.toInputIE(_m.currentScreen, i)
 			_m.inputs[inputE].Blur()
 		}
 
-		if _m.selected < len(_m.renderedInputIndexes(_m.currentScreen)) {
+		inputs := _m.renderedInputIndexes(_m.currentScreen)
+		if _m.selected <= inputs[len(inputs)-1] {
 			focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
+			cmds = append(cmds, tea.Printf("focusedInputE: %v", focusedInputE))
 
 			cmd := _m.inputs[focusedInputE].Focus()
 			cmds = append(cmds, cmd)
 		}
 	}
 
+	cmds = append(cmds, tea.Println())
 	return _m, tea.Batch(cmds...)
 }
 
@@ -624,6 +634,8 @@ func (_m *dihdahModel) navigateUp() tea.Cmd {
 		return nil
 	}
 
+	oldSelected := _m.selected
+
 	_m.selected -= 1
 	if _m.selected < 0 {
 		_m.selected = maxIdx
@@ -631,14 +643,26 @@ func (_m *dihdahModel) navigateUp() tea.Cmd {
 
 	inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
 	if !inputScreen {
-		return tea.Printf("_m.selected: %v\n", _m.selected)
+		return tea.Printf("_m.selected: %v", _m.selected)
 	}
 
 	indexes := _m.renderedInputIndexes(_m.currentScreen)
-	if _m.selected < len(indexes) {
-		_m.selected = indexes[_m.selected]
+	if _m.selected < indexes[len(indexes)-1] {
+		reverseIndex := 0
+		for i, inputE := range slices.Backward(indexes) {
+			if oldSelected == inputE {
+				reverseIndex = i
+				break
+			}
+		}
+
+		_m.selected = indexes[reverseIndex-1]
 	}
-	return tea.Printf("_m.selected: %v\n", _m.selected)
+
+	return tea.Sequence(
+		tea.Printf("_m.selected: %v", _m.selected),
+		tea.Printf("indexes: %v", indexes),
+	)
 }
 
 func (_m *dihdahModel) navigateDown() tea.Cmd {
@@ -647,21 +671,33 @@ func (_m *dihdahModel) navigateDown() tea.Cmd {
 		return nil
 	}
 
+	oldSelected := _m.selected
 	_m.selected = (_m.selected + 1) % (maxIdx + 1)
 
 	inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
 	if !inputScreen {
-		return tea.Printf("_m.selected: %v\n", _m.selected)
+		return tea.Printf("_m.selected: %v", _m.selected)
 	}
 
 	indexes := _m.renderedInputIndexes(_m.currentScreen)
-	if _m.selected < len(indexes) {
-		_m.selected = indexes[_m.selected]
+	if _m.selected < indexes[len(indexes)-1] {
+		reverseIndex := 0
+		for i, inputE := range indexes {
+			if oldSelected == inputE {
+				reverseIndex = i
+				break
+			}
+		}
+
+		_m.selected = indexes[reverseIndex+1]
 	} else {
-		_m.selected = max(_m.selected, len(indexes))
+		_m.selected = max(_m.selected, indexes[len(indexes)-1])
 	}
 
-	return tea.Printf("_m.selected: %v\n", _m.selected)
+	return tea.Sequence(
+		tea.Printf("_m.selected: %v", _m.selected),
+		tea.Printf("indexes: %v", indexes),
+	)
 }
 
 func (_m *dihdahModel) updateInputUI() {
@@ -735,8 +771,6 @@ func (_m *dihdahModel) uiMaxIndex(currentScreen screenEnum) (bool, int) {
 	isUiScreen := true
 	maxIdx := 0
 
-	inputs := _m.renderedInputIndexes(currentScreen)
-
 	switch currentScreen {
 	default:
 		isUiScreen = false
@@ -754,8 +788,8 @@ func (_m *dihdahModel) uiMaxIndex(currentScreen screenEnum) (bool, int) {
 	case decodeWordOptScreen:
 		fallthrough
 	case decodeQuoteOptScreen:
-		inputsMax := len(inputs) - 1
-		maxIdx = inputsMax + 2
+		inputs := _m.renderedInputIndexes(currentScreen)
+		maxIdx = inputs[len(inputs)-1] + 2
 	}
 
 	return isUiScreen, maxIdx
@@ -783,7 +817,8 @@ func inputsRawMaxIdx(currentScreen screenEnum) (bool, int) {
 
 func (_m dihdahModel) toInputIE(currentScreen screenEnum, localInputE int) inputsE {
 	inputE := 0
-	if inputsLen := len(_m.renderedInputIndexes(currentScreen)); localInputE >= inputsLen {
+	inputs := _m.renderedInputIndexes(currentScreen)
+	if len(inputs) == 0 || localInputE > inputs[len(inputs)-1] {
 		return 0
 	}
 
@@ -901,7 +936,8 @@ func (_m *dihdahModel) View() string {
 	}
 
 	if len(inputFields) != 0 {
-		offsettedSelected := _m.selected - len(_m.renderedInputIndexes(_m.currentScreen))
+		indexes := _m.renderedInputIndexes(_m.currentScreen)
+		offsettedSelected := _m.selected - (indexes[len(indexes)-1] + 1)
 		renderedCommonOpts := renderOpts([]string{
 			"Start training",
 			"Back",
