@@ -14,7 +14,6 @@ var Cmd = &cobra.Command{
 	Short: "Drills for learning morse code characters",
 	Long:  ui.RootCmdLong,
 	// TODO: Create a user interface for general users.
-	// TODO: Embed quotes.txt and words.txt
 }
 
 func Execute() {

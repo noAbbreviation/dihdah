@@ -1,12 +1,15 @@
 package components
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type TextInput struct {
-	Input textinput.Model
+	Input            textinput.Model
+	InvalidHighlight string
 }
 
 func (m *TextInput) Init() tea.Cmd {
@@ -20,7 +23,12 @@ func (m *TextInput) Update(msg tea.Msg) (Input, tea.Cmd) {
 	return m, cmd
 }
 func (m *TextInput) View() string {
-	return m.Input.View()
+	invalidHighlight := ""
+	if m.Input.Err != nil {
+		invalidHighlight = m.InvalidHighlight
+	}
+
+	return fmt.Sprintf("%v%v%v", invalidHighlight, m.Input.View(), invalidHighlight)
 }
 
 // Returns a wrapped string

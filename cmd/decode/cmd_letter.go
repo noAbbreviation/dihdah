@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var newLettersPerLevel = []string{
+var newLettersPerLevel = [...]string{
 	"the",
 	"dog",
 	"brown",

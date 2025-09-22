@@ -15,7 +15,9 @@ import (
 )
 
 type FilePicker struct {
-	picker        filepicker.Model
+	picker       filepicker.Model
+	allowedTypes []string
+
 	viewport      viewport.Model
 	SelectingFile bool
 
@@ -27,6 +29,22 @@ func NewFilePicker(width int, allowedTypes ...string) *FilePicker {
 	cursor := cursor.New()
 	cursor.SetChar(" ")
 
+	if width <= 0 {
+		width = 20
+	}
+
+	viewport := viewport.New(width, 1)
+	viewport.SetHorizontalStep(2)
+
+	return &FilePicker{
+		Cursor:       cursor,
+		picker:       newInternalFilePicker(allowedTypes),
+		allowedTypes: allowedTypes,
+		viewport:     viewport,
+	}
+}
+
+func newInternalFilePicker(allowedTypes []string) filepicker.Model {
 	filePicker := filepicker.New()
 	filePicker.SetHeight(15)
 	filePicker.ShowPermissions = false
@@ -36,19 +54,7 @@ func NewFilePicker(width int, allowedTypes ...string) *FilePicker {
 		allowedTypes = []string{".txt"}
 	}
 	filePicker.AllowedTypes = allowedTypes
-
-	if width <= 0 {
-		width = 20
-	}
-
-	viewport := viewport.New(width, 1)
-	viewport.SetHorizontalStep(2)
-
-	return &FilePicker{
-		Cursor:   cursor,
-		picker:   filePicker,
-		viewport: viewport,
-	}
+	return filePicker
 }
 
 func (m *FilePicker) Focus() tea.Cmd {
@@ -87,7 +93,7 @@ func (m *FilePicker) SetValue(filePath InputValue) error {
 }
 
 func (m *FilePicker) Reset() {
-	m.picker.Init()
+	m.picker = newInternalFilePicker(m.allowedTypes)
 }
 
 func (m *FilePicker) Init() tea.Cmd {
