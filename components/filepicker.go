@@ -113,7 +113,7 @@ func (m *FilePicker) update(msg tea.Msg) (*FilePicker, tea.Cmd) {
 			}
 		}
 
-		cmds := make([]tea.Cmd, 4)
+		cmds := make([]tea.Cmd, 3)
 		m.picker, cmds[0] = m.picker.Update(msg)
 
 		if didSelect, filePath := m.picker.DidSelectFile(msg); didSelect {

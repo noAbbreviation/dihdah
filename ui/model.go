@@ -125,8 +125,8 @@ type encodeIE int
 
 const (
 	encode__level_IE encodeIE = iota
-	encode__recap_IE
 	encode__interations_IE
+	encode__recap_IE
 	encode__custom_IE
 	encode__letters_IE
 
@@ -137,8 +137,8 @@ const (
 func (inputEnum encodeIE) toInputEnum() inputsE {
 	return [...]inputsE{
 		letterLevelIE,
-		recapIE,
 		iterationsIE,
+		recapIE,
 		customIE,
 		lettersIE,
 	}[inputEnum]
@@ -148,8 +148,8 @@ type decodeLettersIE int
 
 const (
 	decodeLetters__level_IE decodeLettersIE = iota
-	decodeLetters__recap_IE
 	decodeLetters__iterations_IE
+	decodeLetters__recap_IE
 	decodeLetters__custom_IE
 	decodeLetters__letters_IE
 	decodeLetters__speed_IE
@@ -233,9 +233,9 @@ func newDihdahModel() *dihdahModel {
 	emptyStr := ""
 
 	encodeFields := [...]inputField{
-		{Prefix: "Level"}, // Show: !customChecked
+		{Prefix: "Level"},        // Show: !customChecked
+		{Prefix: "  Iterations"}, // Show: !recapChecked
 		{Prefix: "Recap?"},
-		{Prefix: "Iterations"}, // Show: !recapChecked
 		{Prefix: "Custom letters?"},
 		{Prefix: "  Letters to use"}, // Show: customChecked
 	}
@@ -415,11 +415,58 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 
-			switch _m.currentScreen {
-			default:
-				fallthrough
+			const (
+				_ int = iota
 
-			// TODO: Add final glue to drills here
+				startButtonOffset
+				backButtonOffset
+			)
+
+			switch _m.currentScreen {
+			case encodeOptScreen:
+				indexes := _m.renderedInputIndexes(_m.currentScreen)
+				lastIdx := indexes[len(indexes)-1]
+
+				switch _m.selected {
+				case lastIdx + backButtonOffset:
+					_m.currentScreen = encodeScreen
+				case lastIdx + startButtonOffset:
+					// TODO: glue here
+				}
+
+			case decodeLetterOptScreen:
+				indexes := _m.renderedInputIndexes(_m.currentScreen)
+				lastIdx := indexes[len(indexes)-1]
+
+				switch _m.selected {
+				case lastIdx + backButtonOffset:
+					_m.currentScreen = decodeScreen
+				case lastIdx + startButtonOffset:
+					// TODO: glue here
+				}
+
+			case decodeWordOptScreen:
+				indexes := _m.renderedInputIndexes(_m.currentScreen)
+				lastIdx := indexes[len(indexes)-1]
+
+				switch _m.selected {
+				case lastIdx + backButtonOffset:
+					_m.currentScreen = decodeScreen
+				case lastIdx + startButtonOffset:
+					// TODO: glue here
+				}
+
+			case decodeQuoteOptScreen:
+				indexes := _m.renderedInputIndexes(_m.currentScreen)
+				lastIdx := indexes[len(indexes)-1]
+
+				switch _m.selected {
+				case lastIdx + backButtonOffset:
+					_m.currentScreen = decodeScreen
+				case lastIdx + startButtonOffset:
+					// TODO: glue here
+				}
+
 			case mainScreen:
 				switch mainScreenOpts(_m.selected) {
 				case encodeSelectM:
@@ -504,7 +551,22 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			_m.selected = 0
+			if isUiScreen {
+				_m.selected = 0
+				break
+			}
+
+			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
+			if !inputScreen {
+				break
+			}
+
+			inputIndexes := _m.renderedInputIndexes(_m.currentScreen)
+			_m.selected = inputIndexes[0]
+
+			cmd := _m.inputs[_m.selected].Focus()
+			cmds = append(cmds, cmd)
+
 			_m.updateInputUI()
 		case "down", "ctrl+n", "shift+tab":
 			isUiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
@@ -558,29 +620,44 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 
+			if !inputScreen {
+				break
+			}
+
 			inputs := _m.renderedInputIndexes(_m.currentScreen)
 			if _m.selected > inputs[len(inputs)-1] {
 				return _m, tea.Batch(cmds...)
 			}
 
-			var cmd tea.Cmd
 			focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
+			doDefaultUpdate := true
 
 			switch input := _m.inputs[focusedInputE].(type) {
 			case *components.Number:
 				switch msg.String() {
-				case "+", "=", ".", ">", "right":
+				case "+", "=", ".", ">", "right", "l":
 					input.Increment()
-				case "-", "_", ",", "<", "left":
+					doDefaultUpdate = false
+
+				case "-", "_", ",", "<", "left", "h":
 					input.Decrement()
-				default:
-					_m.inputs[focusedInputE], cmd = _m.inputs[focusedInputE].Update(msg)
+					doDefaultUpdate = false
 				}
-			default:
-				_m.inputs[focusedInputE], cmd = _m.inputs[focusedInputE].Update(msg)
 			}
 
-			cmds = append(cmds, cmd)
+			switch msg.String() {
+			case "ctrl+r":
+				_m.inputs[focusedInputE].Reset()
+				doDefaultUpdate = false
+			}
+
+			if doDefaultUpdate {
+				var cmd tea.Cmd
+
+				_m.inputs[focusedInputE], cmd = _m.inputs[focusedInputE].Update(msg)
+				cmds = append(cmds, cmd)
+			}
+
 			_m.updateInputUI()
 		}
 	default:
@@ -672,7 +749,13 @@ func (_m *dihdahModel) navigateDown() tea.Cmd {
 	}
 
 	oldSelected := _m.selected
-	_m.selected = (_m.selected + 1) % (maxIdx + 1)
+	wrappedAround := false
+
+	_m.selected += 1
+	if _m.selected > maxIdx {
+		wrappedAround = true
+		_m.selected = 0
+	}
 
 	inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
 	if !inputScreen {
@@ -680,6 +763,11 @@ func (_m *dihdahModel) navigateDown() tea.Cmd {
 	}
 
 	indexes := _m.renderedInputIndexes(_m.currentScreen)
+	if wrappedAround {
+		_m.selected = indexes[0]
+		return tea.Println("wrapped around")
+	}
+
 	if _m.selected < indexes[len(indexes)-1] {
 		reverseIndex := 0
 		for i, inputE := range indexes {
@@ -690,10 +778,13 @@ func (_m *dihdahModel) navigateDown() tea.Cmd {
 		}
 
 		_m.selected = indexes[reverseIndex+1]
-	} else {
-		_m.selected = max(_m.selected, indexes[len(indexes)-1])
+		return tea.Sequence(
+			tea.Printf("_m.selected: %v", _m.selected),
+			tea.Printf("indexes: %v", indexes),
+		)
 	}
 
+	_m.selected = max(_m.selected, indexes[len(indexes)-1])
 	return tea.Sequence(
 		tea.Printf("_m.selected: %v", _m.selected),
 		tea.Printf("indexes: %v", indexes),
@@ -951,7 +1042,7 @@ func (_m *dihdahModel) View() string {
 			"",
 			renderedCommonOpts,
 			"",
-			"(training options) (up/down to navigate, left/right to change numbers, space to toggle, ctrl+x to clear selection)",
+			"(training options) (up/down to navigate, left/right to change numbers, space to toggle, ctrl+r to reset selection)",
 			"",
 		)
 	}
