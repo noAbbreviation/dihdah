@@ -19,6 +19,17 @@ const (
 	viewPortHeight = 10
 )
 
+type updater[T any] interface {
+	Update(tea.Msg) (T, tea.Cmd)
+}
+
+func updateModel[T updater[T]](cmds *[]tea.Cmd, model *T, msg tea.Msg) {
+	var cmd tea.Cmd
+
+	*model, cmd = (*model).Update(msg)
+	*cmds = append(*cmds, cmd)
+}
+
 type dihdahModel struct {
 	inputs []components.Input
 
@@ -333,7 +344,8 @@ func initInputs() []components.Input {
 func (_m *dihdahModel) Init() tea.Cmd {
 	cmds := make([]tea.Cmd, 0, len(_m.inputs))
 	for _, input := range _m.inputs {
-		cmds = append(cmds, input.Init())
+		cmd := input.Init()
+		cmds = append(cmds, cmd)
 	}
 
 	return tea.Sequence(textinput.Blink, tea.Batch(cmds...))
@@ -354,10 +366,7 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if isHelp {
-		var cmd tea.Cmd
-		_m.helpViewPort, cmd = _m.helpViewPort.Update(msg)
-
-		cmds = append(cmds, cmd)
+		updateModel(&cmds, &_m.helpViewPort, msg)
 	}
 
 	uiNavigate := false
@@ -629,10 +638,7 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if doDefaultUpdate {
-				var cmd tea.Cmd
-
-				_m.inputs[focusedInputE], cmd = _m.inputs[focusedInputE].Update(msg)
-				cmds = append(cmds, cmd)
+				updateModel(&cmds, &_m.inputs[focusedInputE], msg)
 			}
 
 			_m.updateInputUI()
@@ -647,13 +653,10 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 
-		var cmd tea.Cmd
-
 		focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
-		_m.inputs[focusedInputE], cmd = _m.inputs[focusedInputE].Update(msg)
-		_m.updateInputUI()
+		updateModel(&cmds, &_m.inputs[focusedInputE], msg)
 
-		cmds = append(cmds, cmd)
+		_m.updateInputUI()
 		return _m, tea.Batch(cmds...)
 	}
 
