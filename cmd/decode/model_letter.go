@@ -307,7 +307,7 @@ func (_m *letterModel) View() string {
 		return lipgloss.JoinVertical(
 			lipgloss.Left,
 			fmt.Sprintf(
-				"Decoding training results (%v letters, %v iterations):",
+				"Decode letter training results (%v letters, %v iterations):",
 				len(_m.lettersUsed),
 				len(drill.Text),
 			),
@@ -323,7 +323,7 @@ func (_m *letterModel) View() string {
 		lipgloss.Left,
 		"",
 		fmt.Sprintf(
-			"Decode training (%v letters) (%v of %v)",
+			"Decode letter training (%v letters) (%v of %v)",
 			len(_m.lettersUsed),
 			drill.Current+1,
 			len(drill.Text),

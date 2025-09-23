@@ -376,7 +376,7 @@ func (_m *wordModel) View() string {
 		return lipgloss.JoinVertical(
 			lipgloss.Left,
 			fmt.Sprintf(
-				"Decoding words training results (%v, %v iterations):",
+				"Decode word training results (%v, %v iterations):",
 				trainingSpecification,
 				len(drills.Drills),
 			),
@@ -392,7 +392,7 @@ func (_m *wordModel) View() string {
 		lipgloss.Left,
 		"",
 		fmt.Sprintf(
-			"Decode training (%v) (%v of %v)",
+			"Decode word training (%v) (%v of %v)",
 			trainingSpecification,
 			drills.CurrentDrill+1,
 			len(drills.Drills),
