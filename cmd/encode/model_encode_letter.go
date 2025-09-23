@@ -273,7 +273,7 @@ func (_m *letterModel) View() string {
 			"",
 			_m.resultsTable.View(),
 			"",
-			fmt.Sprintf("%v (escape / ctrl+c / enter to go back)", scoreText),
+			fmt.Sprintf("%v (escape/enter to go back, ctrl+c to exit)", scoreText),
 			"",
 		)
 	}
@@ -292,7 +292,7 @@ func (_m *letterModel) View() string {
 		fmt.Sprintf("Letter '%v' (%v of %v)", charView, drill.Current+1, len(drill.Text)),
 		_m.input.View(),
 		"",
-		"(escape/ctrl+c to go back, enter to confirm)",
+		"(escape to go back, enter to confirm, ctrl+c to exit)",
 		"",
 	)
 }

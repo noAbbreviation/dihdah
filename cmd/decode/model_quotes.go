@@ -133,14 +133,12 @@ func (_m *quoteModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
-			case "esc":
+			case "esc", "enter":
 				if _m.backReference == nil {
 					return _m, tea.Quit
 				}
 
 				return _m.backReference, nil
-			case "ctrl+c":
-				return _m, tea.Quit
 			}
 		}
 		return _m, nil
@@ -328,7 +326,7 @@ func (_m *quoteModel) View() string {
 			"",
 			_m.displayedResults,
 			"",
-			fmt.Sprintf("%v (ctrl+c/esc to go back)", scoreText),
+			fmt.Sprintf("%v (ctrl+c to exit, escape/enter to go back)", scoreText),
 			"",
 		)
 	}
@@ -339,7 +337,7 @@ func (_m *quoteModel) View() string {
 		"",
 		_m.input.View(),
 		"",
-		"(ctrl+l to stop/restart playing, ctrl+s to confirm answer, ctrl+c/esc to clear or go back)",
+		"(ctrl+l to stop/restart playing, ctrl+s to confirm answer, esc to clear or go back, ctrl+c to exit)",
 		"",
 	)
 }

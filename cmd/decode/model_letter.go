@@ -131,7 +131,8 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if _m.showResults {
 		if key, isKey := msg.(tea.KeyMsg); isKey {
-			if key.String() == "enter" {
+			switch key.String() {
+			case "enter", "esc":
 				if _m.backReference == nil {
 					return _m, tea.Quit
 				}
@@ -313,7 +314,7 @@ func (_m *letterModel) View() string {
 			"",
 			_m.resultsTable.View(),
 			"",
-			fmt.Sprintf("%v (escape / ctrl+c / enter to go back)", scoreText),
+			fmt.Sprintf("%v (escape/enter to go back, ctrl+c to exit)", scoreText),
 			"",
 		)
 	}
@@ -329,7 +330,7 @@ func (_m *letterModel) View() string {
 		),
 		_m.input.View(),
 		"",
-		"(escape/ctrl+c to go back, space to repeat sound, enter to confirm)",
+		"(escape to go back, space to repeat sound, enter to confirm, ctrl+c to exit)",
 		"",
 	)
 }
