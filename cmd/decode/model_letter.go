@@ -14,6 +14,8 @@ import (
 )
 
 type letterModel struct {
+	backReference tea.Model
+
 	drill       *commons.Drill
 	lettersUsed string
 	speed       float64
@@ -29,7 +31,7 @@ type letterModel struct {
 	replaySignal chan<- struct{}
 }
 
-func newLetterModel(trainingLetters string, lettersUsed string, speed float64) *letterModel {
+func NewLetterModel(trainingLetters string, lettersUsed string, speed float64, backRef tea.Model) *letterModel {
 	drills := &commons.Drill{
 		Text:    trainingLetters,
 		Correct: make([]bool, len(trainingLetters)),
@@ -42,11 +44,12 @@ func newLetterModel(trainingLetters string, lettersUsed string, speed float64) *
 	input.Focus()
 
 	return &letterModel{
-		drill:       drills,
-		input:       input,
-		lettersUsed: lettersUsed,
-		userAnswers: make([]rune, len(trainingLetters)),
-		speed:       speed,
+		backReference: backRef,
+		drill:         drills,
+		input:         input,
+		lettersUsed:   lettersUsed,
+		userAnswers:   make([]rune, len(trainingLetters)),
+		speed:         speed,
 	}
 }
 
@@ -115,7 +118,13 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc":
+		case "esc":
+			if _m.backReference == nil {
+				return _m, tea.Quit
+			}
+
+			return _m.backReference, nil
+		case "ctrl+c":
 			return _m, tea.Quit
 		}
 	}
@@ -123,7 +132,11 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if _m.showResults {
 		if key, isKey := msg.(tea.KeyMsg); isKey {
 			if key.String() == "enter" {
-				return _m, tea.Quit
+				if _m.backReference == nil {
+					return _m, tea.Quit
+				}
+
+				return _m.backReference, nil
 			}
 		}
 

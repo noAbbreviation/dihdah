@@ -41,16 +41,9 @@ var LetterCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		detectedNonAlphabet := false
 		letters, _ := cmd.Flags().GetString("letters")
-
-		letters = strings.ToLower(letters)
-		letters = strings.Map(func(r rune) rune {
-			if r >= 'a' && r <= 'z' {
-				return r
-			}
-
-			detectedNonAlphabet = true
-			return -1
-		}, letters)
+		if len(letters) != 0 {
+			letters = DedupCleanLetters(letters)
+		}
 
 		if detectedNonAlphabet {
 			if len(letters) == 0 {
@@ -77,7 +70,7 @@ var LetterCmd = &cobra.Command{
 			}
 		}
 
-		dedupedLetters := dedupLetters(letters)
+		dedupedLetters := DedupCleanLetters(letters)
 		speed, _ := cmd.Flags().GetFloat64("speed")
 
 		doAllLetters, _ := cmd.Flags().GetBool("recap")
@@ -87,7 +80,7 @@ var LetterCmd = &cobra.Command{
 				allLettersRand[i], allLettersRand[j] = allLettersRand[j], allLettersRand[i]
 			})
 
-			p := tea.NewProgram(newLetterModel(string(allLettersRand), dedupedLetters, speed))
+			p := tea.NewProgram(NewLetterModel(string(allLettersRand), dedupedLetters, speed, nil))
 			if _, err := p.Run(); err != nil {
 				return fmt.Errorf("Error running the program: %v", err)
 			}
@@ -106,7 +99,7 @@ var LetterCmd = &cobra.Command{
 			trainingLetters += string(randomLetter)
 		}
 
-		p := tea.NewProgram(newLetterModel(trainingLetters, dedupedLetters, speed))
+		p := tea.NewProgram(NewLetterModel(trainingLetters, dedupedLetters, speed, nil))
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("Error running the program: %v", err)
 		}
@@ -168,8 +161,8 @@ NOTES:
 	slow down or speed up the sound being played.`,
 }
 
-func dedupLetters(str string) string {
-	runes := []rune(str)
+func DedupCleanLetters(str string) string {
+	runes := []rune(strings.ToLower(str))
 	firstLetter := runes[0]
 
 	letters := string(firstLetter)
@@ -179,7 +172,9 @@ func dedupLetters(str string) string {
 			continue
 		}
 
-		letters += string(rune)
+		if rune >= 'a' && rune <= 'z' {
+			letters += string(rune)
+		}
 	}
 
 	return letters

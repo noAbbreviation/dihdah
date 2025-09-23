@@ -94,6 +94,7 @@ func (m *FilePicker) SetValue(filePath InputValue) error {
 
 func (m *FilePicker) Reset() {
 	m.picker = newInternalFilePicker(m.allowedTypes)
+	m.viewport.SetContent("")
 }
 
 func (m *FilePicker) Init() tea.Cmd {
@@ -122,7 +123,6 @@ func (m *FilePicker) update(msg tea.Msg) (*FilePicker, tea.Cmd) {
 
 			cmds[1] = tea.ExitAltScreen
 			cmds[2] = m.Focus()
-			// cmds = append(cmds, tea.Printf("setting display to: %v\n", filePath))
 		}
 
 		return m, tea.Batch(cmds[:]...)

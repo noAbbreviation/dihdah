@@ -117,7 +117,7 @@ var WordCmd = &cobra.Command{
 		}
 
 		speed, _ := cmd.Flags().GetFloat64("speed")
-		p := tea.NewProgram(newWordModel(words, wordLength, speed))
+		p := tea.NewProgram(NewWordModel(words, wordLength, speed, nil))
 
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("Error running the model: %v\n", err)

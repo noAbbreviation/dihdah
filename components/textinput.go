@@ -47,7 +47,7 @@ func (m *TextInput) SetValue(str InputValue) error {
 }
 
 func (m *TextInput) Reset() {
-	m.Reset()
+	m.Input.Reset()
 }
 
 func (m *TextInput) Focus() tea.Cmd {

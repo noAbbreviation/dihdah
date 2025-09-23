@@ -15,6 +15,8 @@ import (
 )
 
 type wordModel struct {
+	backReference tea.Model
+
 	drills  *commons.TrainingModel
 	speed   float64
 	wordLen uint16
@@ -28,9 +30,10 @@ type wordModel struct {
 
 	wordPlayer   chan<- string
 	replaySignal chan<- struct{}
+	killSignal   chan<- struct{}
 }
 
-func newWordModel(words []string, wordLen uint16, speed float64) *wordModel {
+func NewWordModel(words []string, wordLen uint16, speed float64, backReference tea.Model) *wordModel {
 	drills := []commons.Drill{}
 
 	for _, word := range words {
@@ -45,6 +48,7 @@ func newWordModel(words []string, wordLen uint16, speed float64) *wordModel {
 	input.Focus()
 
 	return &wordModel{
+		backReference: backReference,
 		drills: &commons.TrainingModel{
 			Drills:  drills,
 			Correct: make([]bool, len(drills)),
@@ -56,9 +60,15 @@ func newWordModel(words []string, wordLen uint16, speed float64) *wordModel {
 	}
 }
 
-func initPlayingMorseCodeWords(speed float64) (tea.Cmd, chan<- string, chan<- struct{}) {
-	replaySignal := make(chan struct{}, 16)
+func initPlayingMorseCodeWords(speed float64) (
+	cmd tea.Cmd,
+	wordSignal chan<- string,
+	replaySignal chan<- struct{},
+	killSignal chan<- struct{},
+) {
+	_replaySignal := make(chan struct{}, 16)
 	newWord := make(chan string, 16)
+	_killSignal := make(chan struct{}, 16)
 
 	mixer := &beep.Mixer{}
 	var currentSound *beep.Buffer
@@ -67,6 +77,16 @@ func initPlayingMorseCodeWords(speed float64) (tea.Cmd, chan<- string, chan<- st
 		speaker.Play(mixer)
 
 		for {
+			select {
+			case <-_killSignal:
+				speaker.Lock()
+				mixer.Clear()
+				speaker.Unlock()
+
+				return doneMsg{}
+			default:
+			}
+
 			select {
 			case word, ok := <-newWord:
 				if !ok {
@@ -113,7 +133,7 @@ func initPlayingMorseCodeWords(speed float64) (tea.Cmd, chan<- string, chan<- st
 			}
 
 			select {
-			case <-replaySignal:
+			case <-_replaySignal:
 				speaker.Lock()
 
 				mixer.Clear()
@@ -127,12 +147,12 @@ func initPlayingMorseCodeWords(speed float64) (tea.Cmd, chan<- string, chan<- st
 		}
 	}
 
-	return playingCmd, newWord, replaySignal
+	return playingCmd, newWord, _replaySignal, _killSignal
 }
 
 func (_m *wordModel) Init() tea.Cmd {
 	var playingCmd tea.Cmd
-	playingCmd, _m.wordPlayer, _m.replaySignal = initPlayingMorseCodeWords(_m.speed)
+	playingCmd, _m.wordPlayer, _m.replaySignal, _m.killSignal = initPlayingMorseCodeWords(_m.speed)
 
 	_m.wordPlayer <- _m.drills.Drills[_m.drills.CurrentDrill].Text
 	_m.replaySignal <- struct{}{}
@@ -146,7 +166,14 @@ func (_m *wordModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc":
+		case "esc":
+			if _m.backReference == nil {
+				return _m, tea.Quit
+			}
+
+			_m.killSignal <- struct{}{}
+			return _m.backReference, nil
+		case "ctrl+c":
 			return _m, tea.Quit
 		}
 	}
@@ -154,7 +181,12 @@ func (_m *wordModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if _m.showResults {
 		if key, isKey := msg.(tea.KeyMsg); isKey {
 			if key.String() == "enter" {
-				return _m, tea.Quit
+				if _m.backReference == nil {
+					return _m, tea.Quit
+				}
+
+				_m.killSignal <- struct{}{}
+				return _m.backReference, nil
 			}
 		}
 
@@ -261,7 +293,7 @@ func (_m wordModel) initResultsTable() table.Model {
 
 		correctionString := ""
 		for i, userRune := range userAnswer {
-			if i > len(realAnswer) {
+			if i >= len(realAnswer) {
 				correctionString += "+"
 				continue
 			}
@@ -295,9 +327,14 @@ func (_m wordModel) initResultsTable() table.Model {
 			"",
 			correctionString,
 		}
+		paddingRow := table.Row{"", "", "", ""}
 
-		rows = append(rows, firstRow)
-		rows = append(rows, correctionStringRow)
+		rows = append(
+			rows,
+			firstRow,
+			correctionStringRow,
+			paddingRow,
+		)
 	}
 
 	columns := []table.Column{

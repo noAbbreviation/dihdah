@@ -30,7 +30,7 @@ First off, two caveats:
   - Encode drills are only for learning the morse code alphabet, not for learning
     the timings of how to send a morse code signal. The terminal does not give a consistent
     interface for detecting how long a keypress is held, so this is an unfortunate situation :(
-  - For convenience of the user, the application uses comma{,} as the dashes and the period{.} as the dot.
+  - For the convenience of the user, the application uses comma{,} as the dashes and the period{.} as the dot.
 
 These are the two main things the user can do:
   - 'dihdah encode': Gives the user drills to learn how to write the morse code alphabet (the letters a-z).

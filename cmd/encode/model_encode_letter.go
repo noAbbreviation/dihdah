@@ -14,6 +14,8 @@ import (
 )
 
 type letterModel struct {
+	backReference tea.Model
+
 	drill       *commons.Drill
 	lettersUsed string
 
@@ -26,7 +28,7 @@ type letterModel struct {
 	charPlayer chan<- rune
 }
 
-func newLetterModel(trainingLetters string) *letterModel {
+func NewLetterModel(trainingLetters string, backReference tea.Model) *letterModel {
 	drills := &commons.Drill{
 		Text:    trainingLetters,
 		Correct: make([]bool, len(trainingLetters)),
@@ -39,9 +41,10 @@ func newLetterModel(trainingLetters string) *letterModel {
 	input.Focus()
 
 	return &letterModel{
-		drill:       drills,
-		input:       input,
-		lettersUsed: trainingLetters,
+		drill:         drills,
+		backReference: backReference,
+		input:         input,
+		lettersUsed:   trainingLetters,
 	}
 }
 
@@ -53,25 +56,21 @@ func initPlayingMorseCode(speed float64) (tea.Cmd, chan<- rune) {
 
 	playingCmd := func() tea.Msg {
 		for {
-			var c rune
-			var ok bool
+			c, ok := <-chars
 
-			select {
-			case c, ok = <-chars:
-				playing.Wait()
-				playing.Add(1)
+			playing.Wait()
+			playing.Add(1)
 
-				morseCode := commons.MorseCharSound(commons.MorseCodeLookup[c], speed)
-				delayBuffer := commons.SoundAssets[commons.ShortDelay]
+			morseCode := commons.MorseCharSound(commons.MorseCodeLookup[c], speed)
+			delayBuffer := commons.SoundAssets[commons.ShortDelay]
 
-				speaker.Play(
-					beep.Seq(
-						morseCode,
-						delayBuffer.Streamer(0, delayBuffer.Len()),
-						beep.Callback(playing.Done),
-					),
-				)
-			}
+			speaker.Play(
+				beep.Seq(
+					morseCode,
+					delayBuffer.Streamer(0, delayBuffer.Len()),
+					beep.Callback(playing.Done),
+				),
+			)
 
 			if !ok && len(chars) == 0 {
 				return doneMsg{}
@@ -97,7 +96,13 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc":
+		case "esc":
+			if _m.backReference == nil {
+				return _m, tea.Quit
+			}
+
+			return _m.backReference, nil
+		case "ctrl+c":
 			return _m, tea.Quit
 		}
 	}
@@ -105,7 +110,11 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if _m.showResults {
 		if key, isKey := msg.(tea.KeyMsg); isKey {
 			if key.String() == "enter" {
-				return _m, tea.Quit
+				if _m.backReference == nil {
+					return _m, tea.Quit
+				}
+
+				return _m.backReference, nil
 			}
 		}
 

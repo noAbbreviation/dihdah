@@ -79,11 +79,11 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		dedupedLetters := DedupLetters(letters)
+		dedupedLetters := DedupCleanLetters(letters)
 
 		doAllLetters, _ := cmd.Flags().GetBool("recap")
 		if doAllLetters {
-			p := tea.NewProgram(newLetterModel(dedupedLetters))
+			p := tea.NewProgram(NewLetterModel(dedupedLetters, nil))
 			if _, err := p.Run(); err != nil {
 				return fmt.Errorf("Error running the program: %v", err)
 			}
@@ -102,7 +102,7 @@ var Cmd = &cobra.Command{
 			trainingLetters += string(randomLetter)
 		}
 
-		p := tea.NewProgram(newLetterModel(trainingLetters))
+		p := tea.NewProgram(NewLetterModel(trainingLetters, nil))
 
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("Error running the program: %v", err)
@@ -166,8 +166,8 @@ NOTES:
     run --level with --recap before proceeding with the next --level.`,
 }
 
-func DedupLetters(str string) string {
-	runes := []rune(str)
+func DedupCleanLetters(str string) string {
+	runes := []rune(strings.ToLower(str))
 	firstLetter := runes[0]
 
 	letters := string(firstLetter)
@@ -177,7 +177,9 @@ func DedupLetters(str string) string {
 			continue
 		}
 
-		letters += string(rune)
+		if rune >= 'a' && rune <= 'z' {
+			letters += string(rune)
+		}
 	}
 
 	return letters

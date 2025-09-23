@@ -15,6 +15,8 @@ import (
 )
 
 type quoteModel struct {
+	backReference tea.Model
+
 	drill *commons.Drill
 	speed float64
 
@@ -28,7 +30,7 @@ type quoteModel struct {
 	toggleSignal chan<- struct{}
 }
 
-func newQuoteModel(quote string, speed float64) *quoteModel {
+func NewQuoteModel(quote string, speed float64, backReference tea.Model) *quoteModel {
 	input := textarea.New()
 	input.Placeholder = "?????"
 	input.MaxHeight = 5
@@ -38,6 +40,7 @@ func newQuoteModel(quote string, speed float64) *quoteModel {
 	input.Focus()
 
 	return &quoteModel{
+		backReference: backReference,
 		drill: &commons.Drill{
 			Text:    quote,
 			Correct: make([]bool, len(quote)),
@@ -94,38 +97,49 @@ func initPlayingMorseCodeQuote(quote string, speed float64) (tea.Cmd, chan<- str
 	mixer := &beep.Mixer{}
 	playingCmd := func() tea.Msg {
 		speaker.Play(mixer)
+		for range toggleSignal {
+			speaker.Lock()
 
-		for {
-			select {
-			case _, ok := <-toggleSignal:
-				if !ok {
-					speaker.Lock()
-					mixer.Clear()
-					speaker.Unlock()
-
-					return doneMsg{}
-				}
-
-				speaker.Lock()
-
-				if mixer.Len() == 0 {
-					mixer.Add(quoteBuffer.Streamer(0, quoteBuffer.Len()))
-				} else {
-					mixer.Clear()
-				}
-
-				speaker.Unlock()
+			if mixer.Len() == 0 {
+				mixer.Add(quoteBuffer.Streamer(0, quoteBuffer.Len()))
+			} else {
+				mixer.Clear()
 			}
+
+			speaker.Unlock()
+
 		}
+
+		speaker.Lock()
+		mixer.Clear()
+		speaker.Unlock()
+
+		return doneMsg{}
 	}
 
 	return playingCmd, toggleSignal
 }
 
 func (_m *quoteModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c":
+			return _m, tea.Quit
+		}
+	}
+
 	if _m.showResults {
-		if key, isKey := msg.(tea.KeyMsg); isKey {
-			if key.String() == "esc" || key.String() == "ctrl+c" {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "esc":
+				if _m.backReference == nil {
+					return _m, tea.Quit
+				}
+
+				return _m.backReference, nil
+			case "ctrl+c":
 				return _m, tea.Quit
 			}
 		}
@@ -155,13 +169,18 @@ func (_m *quoteModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			return _m, nil
-		case "ctrl+c", "esc":
+		case "esc":
 			if len(_m.input.Value()) != 0 {
 				_m.input.SetValue("")
 				return _m, nil
 			}
 
-			return _m, tea.Quit
+			if _m.backReference == nil {
+				return _m, tea.Quit
+			}
+
+			close(_m.toggleSignal)
+			return _m.backReference, nil
 		case "ctrl+l":
 			_m.toggleSignal <- struct{}{}
 			return _m, nil

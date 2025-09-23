@@ -1,7 +1,11 @@
 package ui
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"math/rand"
+	"os"
 	"slices"
 	"strings"
 
@@ -9,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/noAbbreviation/dihdah/assets"
 	"github.com/noAbbreviation/dihdah/cmd/decode"
 	"github.com/noAbbreviation/dihdah/cmd/encode"
 	"github.com/noAbbreviation/dihdah/components"
@@ -181,8 +186,8 @@ type decodeWordsIE int
 
 const (
 	decodeWords__custom_IE decodeWordsIE = iota
-	decodeWords__maxLen_IE
 	decodeWords__level_IE
+	decodeWords__maxLen_IE
 	decodeWords__wordFile_IE
 	decodeWords__speed_IE
 
@@ -194,8 +199,8 @@ const (
 func (inputEnum decodeWordsIE) toInputEnum() inputsE {
 	return [...]inputsE{
 		customIE,
-		maxWordLengthIE,
 		wordLevelIE,
+		maxWordLengthIE,
 		fileNameIE,
 		speedIE,
 	}[inputEnum]
@@ -225,22 +230,11 @@ func viewPortInitContent(viewport *viewport.Model, text *string) {
 }
 
 func validateLetters(s string) error {
-	validLettersCount := 0
 	if len(s) < 3 {
 		return fmt.Errorf("Essentially has no input")
 	}
 
-	for _, r := range encode.DedupLetters(s) {
-		if r >= 'a' && r <= 'z' {
-			validLettersCount += 1
-		}
-
-		if r >= 'A' && r <= 'Z' {
-			validLettersCount += 1
-		}
-	}
-
-	if validLettersCount < 3 {
+	if len(encode.DedupCleanLetters(s)) < 3 {
 		return fmt.Errorf("Essentially has no input")
 	}
 
@@ -324,7 +318,7 @@ func (_m dihdahModel) letterLevelUpdate() {
 		letters += newLetters
 	}
 
-	dedupedLetters := encode.DedupLetters(letters)
+	dedupedLetters := encode.DedupCleanLetters(letters)
 	_m.inputs[lettersIE].SetValue(dedupedLetters)
 
 	iterations := max(float64(len(dedupedLetters)/2), 3)
@@ -334,8 +328,11 @@ func (_m dihdahModel) letterLevelUpdate() {
 func (_m dihdahModel) wordLevelUpdate() {
 	levelArg := int(_m.inputs[wordLevelIE].Value().(float64))
 
-	wordLength := decode.MaxWordLenPerLevel[levelArg-1]
-	_m.inputs[maxWordLengthIE].SetValue(float64(wordLength))
+	wordLengths := decode.MaxWordLenPerLevel
+	levelArg = min(levelArg, len(wordLengths))
+
+	wordLength := float64(wordLengths[levelArg-1])
+	_m.inputs[maxWordLengthIE].SetValue(wordLength)
 }
 
 func initInputs() []components.Input {
@@ -353,7 +350,7 @@ func initInputs() []components.Input {
 	inputs[iterationsIE] = components.NewNumber(1, 1<<16)
 	inputs[iterationsIE].(*components.Number).Default = 3
 
-	inputs[maxWordLengthIE] = components.NewNumber(3, 32)
+	inputs[maxWordLengthIE] = components.NewNumber(3, 1<<16)
 
 	{
 		textInput := textinput.New()
@@ -380,6 +377,9 @@ func (_m *dihdahModel) Init() tea.Cmd {
 		cmds = append(cmds, cmd)
 	}
 
+	_m.letterLevelUpdate()
+	_m.wordLevelUpdate()
+
 	return tea.Sequence(textinput.Blink, tea.Batch(cmds...))
 }
 
@@ -401,7 +401,18 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		updateModel(&cmds, &_m.helpViewPort, msg)
 	}
 
+	insideInput, focusedIdx := _m.toInputIE(_m.currentScreen, _m.selected)
+	if insideInput && focusedIdx == fileNameIE {
+		filePicker := _m.inputs[fileNameIE].(*components.FilePicker)
+
+		if filePicker.SelectingFile {
+			updateModel(&cmds, &_m.inputs[fileNameIE], msg)
+			return _m, tea.Batch(cmds...)
+		}
+	}
+
 	uiNavigate := false
+	doNoOP := false
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -420,7 +431,11 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
 			if inputScreen {
 				specialCase := false
-				focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
+				insideInput, focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
+
+				if !insideInput {
+					goto afterSpecialBackChecks
+				}
 
 				switch input := _m.inputs[focusedIE].(type) {
 				case *components.TextInput:
@@ -430,23 +445,39 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						specialCase = true
 					}
 
+				case *components.FilePicker:
+					switch msg.String() {
+					case "h", "left":
+						updateModel(&cmds, &_m.inputs[focusedIE], msg)
+						specialCase = true
+					}
+
 				case *components.Number:
 					switch msg.String() {
 					case "h", "left":
 						input.Decrement()
+
+						switch focusedIE {
+						case letterLevelIE:
+							_m.letterLevelUpdate()
+						case wordLevelIE:
+							_m.wordLevelUpdate()
+						}
+
 						specialCase = true
 					}
 				}
 
+			afterSpecialBackChecks:
 				if specialCase {
 					break
 				}
 			}
 
-			doNoOP := false
 			switch _m.currentScreen {
 			default:
 				doNoOP = true
+
 			case mainHelp:
 				_m.currentScreen = mainScreen
 
@@ -498,7 +529,11 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
 			if inputScreen {
 				specialCase := false
-				focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
+				insideInput, focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
+
+				if !insideInput {
+					goto afterSpecialForwardChecks
+				}
 
 				switch input := _m.inputs[focusedIE].(type) {
 				case *components.Checkbox:
@@ -510,7 +545,14 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				case *components.TextInput:
 					switch msg.String() {
-					case "l", "L":
+					case "l", "L", " ":
+						updateModel(&cmds, &_m.inputs[focusedIE], msg)
+						specialCase = true
+					}
+
+				case *components.FilePicker:
+					switch msg.String() {
+					case "enter", " ", "l", "right":
 						updateModel(&cmds, &_m.inputs[focusedIE], msg)
 						specialCase = true
 					}
@@ -519,16 +561,23 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					switch msg.String() {
 					case "l", "right":
 						input.Increment()
+
+						switch focusedIE {
+						case letterLevelIE:
+							_m.letterLevelUpdate()
+						case wordLevelIE:
+							_m.wordLevelUpdate()
+						}
+
 						specialCase = true
 					}
 				}
 
+			afterSpecialForwardChecks:
 				if specialCase {
 					break
 				}
 			}
-
-			doNoOP := false
 
 			switch _m.currentScreen {
 			case encodeOptScreen:
@@ -549,7 +598,37 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					_m.currentScreen = encodeHelp
 
 				case lastIdx + startButtonOffset:
-					// TODO: glue here
+					lettersInput := _m.inputs[lettersIE].(*components.TextInput).Input
+					if lettersInput.Err != nil {
+						doNoOP = true
+						break
+					}
+
+					letters := lettersInput.Value()
+					dedupedLetters := encode.DedupCleanLetters(letters)
+					runes := []rune(dedupedLetters)
+
+					trainingLetters := ""
+
+					toRecap := _m.inputs[recapIE].Value().(bool)
+					if toRecap {
+						rand.Shuffle(len(runes), func(i, j int) {
+							runes[i], runes[j] = runes[j], runes[i]
+						})
+
+						trainingLetters = string(runes)
+						encodeModel := encode.NewLetterModel(trainingLetters, _m)
+						return encodeModel, encodeModel.Init()
+					}
+
+					iterations := _m.inputs[iterationsIE].Value().(float64)
+					for range int(iterations) {
+						letter := runes[rand.Intn(len(runes))]
+						trainingLetters += string(letter)
+					}
+
+					encodeModel := encode.NewLetterModel(trainingLetters, _m)
+					return encodeModel, encodeModel.Init()
 				}
 
 			case decodeLetterOptScreen:
@@ -570,7 +649,38 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					_m.currentScreen = decodeLHelp
 
 				case lastIdx + startButtonOffset:
-					// TODO: glue here
+					lettersInput := _m.inputs[lettersIE].(*components.TextInput).Input
+					if lettersInput.Err != nil {
+						doNoOP = true
+						break
+					}
+
+					letters := lettersInput.Value()
+					dedupedLetters := encode.DedupCleanLetters(letters)
+					runes := []rune(dedupedLetters)
+
+					trainingLetters := ""
+					speed := _m.inputs[speedIE].Value().(float64)
+
+					toRecap := _m.inputs[recapIE].Value().(bool)
+					if toRecap {
+						rand.Shuffle(len(runes), func(i, j int) {
+							runes[i], runes[j] = runes[j], runes[i]
+						})
+
+						trainingLetters = string(runes)
+						decodeWordsM := decode.NewLetterModel(trainingLetters, dedupedLetters, speed, _m)
+						return decodeWordsM, decodeWordsM.Init()
+					}
+
+					iterations := _m.inputs[iterationsIE].Value().(float64)
+					for range int(iterations) {
+						letter := runes[rand.Intn(len(runes))]
+						trainingLetters += string(letter)
+					}
+
+					decodeWordsM := decode.NewLetterModel(trainingLetters, dedupedLetters, speed, _m)
+					return decodeWordsM, decodeWordsM.Init()
 				}
 
 			case decodeWordOptScreen:
@@ -591,7 +701,81 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					_m.currentScreen = decodeWHelp
 
 				case lastIdx + startButtonOffset:
-					// TODO: glue here
+					maxWordLen := _m.inputs[maxWordLengthIE].Value().(float64)
+					wordFile := _m.inputs[fileNameIE].Value().(string)
+
+					var wordsReader io.Reader
+
+					if len(wordFile) == 0 {
+						wordsReader = strings.NewReader(assets.Words)
+					} else {
+						file, err := os.Open(wordFile)
+						if err != nil {
+							return Popup{message: []string{
+								"File cannot be found :(",
+								fmt.Sprintf("File name: %v", wordFile),
+							}, backReference: _m}, nil
+						}
+
+						defer file.Close()
+						wordsReader = file
+					}
+					maxWordLens := decode.MaxWordLenPerLevel
+
+					wordPool := []string(nil)
+					scanner := bufio.NewScanner(wordsReader)
+
+					scanner.Split(bufio.ScanWords)
+					for scanner.Scan() {
+						word := scanner.Text()
+						word = strings.Map(func(r rune) rune {
+							if r >= 'a' && r <= 'z' {
+								return r
+							}
+
+							if r >= 'A' && r <= 'Z' {
+								return r
+							}
+
+							if r == '-' {
+								return r
+							}
+
+							return -1
+						}, word)
+
+						if len(word) <= int(maxWordLen) ||
+							int(maxWordLen) >= maxWordLens[len(maxWordLens)-1] {
+
+							wordPool = append(wordPool, word)
+						}
+					}
+
+					// scanner.SplitWords(...) does not return errors!
+					_ = scanner.Err()
+
+					const iterations = 5
+					words := make([]string, 0, iterations)
+
+					if len(wordPool) < iterations {
+						return Popup{message: []string{
+							"Error creating the word training drill:",
+							"There are less available words than training iterations :(",
+						}, backReference: _m}, nil
+					}
+
+					for range iterations {
+						wordIdx := rand.Intn(len(wordPool))
+						words = append(words, wordPool[wordIdx])
+
+						wordPool[wordIdx] = wordPool[len(wordPool)-1]
+						wordPool = wordPool[:len(wordPool)-1]
+					}
+
+					speed := _m.inputs[speedIE].Value().(float64)
+					decodeWModel := decode.NewWordModel(words[:], uint16(maxWordLen), speed, _m)
+
+					return decodeWModel, decodeWModel.Init()
 				}
 
 			case decodeQuoteOptScreen:
@@ -612,8 +796,51 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					_m.currentScreen = decodeQHelp
 
 				case lastIdx + startButtonOffset:
-					// TODO: glue here
+					quoteFile := _m.inputs[fileNameIE].Value().(string)
+
+					var quotesReader io.Reader
+
+					if len(quoteFile) == 0 {
+						quotesReader = strings.NewReader(assets.Words)
+					} else {
+						file, err := os.Open(quoteFile)
+						if err != nil {
+							return Popup{message: []string{
+								"File cannot be found :(",
+								fmt.Sprintf("File name: %v", quoteFile),
+							}, backReference: _m}, nil
+						}
+
+						defer file.Close()
+						quotesReader = file
+					}
+
+					quotes := []string(nil)
+					scanner := bufio.NewScanner(quotesReader)
+
+					scanner.Split(bufio.ScanLines)
+					for scanner.Scan() {
+						quote := strings.TrimSpace(scanner.Text())
+						quotes = append(quotes, quote)
+					}
+
+					// scanner.SplitLines(...) does not return errors!
+					_ = scanner.Err()
+
+					if len(quotes) == 0 {
+						return Popup{message: []string{
+							"Error processing the quote file:",
+							"The quote file is empty :(",
+						}, backReference: _m}, nil
+					}
+
+					speed := _m.inputs[speedIE].Value().(float64)
+					randomQuote := quotes[rand.Intn(len(quotes))]
+
+					decodeQModel := decode.NewQuoteModel(randomQuote, speed, _m)
+					return decodeQModel, decodeQModel.Init()
 				}
+				lipgloss.NewStyle().Render()
 
 			case mainScreen:
 				switch mainScreenOpts(_m.selected) {
@@ -640,10 +867,18 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				case decodeLetterSelectD:
 					_m.currentScreen = decodeLetterOptScreen
+
 				case decodeWordSelectD:
 					_m.currentScreen = decodeWordOptScreen
+					_m.inputs[fileNameIE].Reset()
+
+					cmds = append(cmds, _m.inputs[fileNameIE].Init())
+
 				case decodeQuoteSelectD:
 					_m.currentScreen = decodeQuoteOptScreen
+					_m.inputs[fileNameIE].Reset()
+
+					cmds = append(cmds, _m.inputs[fileNameIE].Init())
 
 				case decodeHelpSelectD:
 					helpText := decode.Cmd.Long
@@ -670,18 +905,55 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_m.selected = indexes[0]
 
 			uiNavigate = true
-		case "down", "ctrl+n", "shift+tab":
+		case "down", "ctrl+n", "shift+tab", "j":
 			isUiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
 
 			if !isUiScreen {
 				break
 			}
 
+			specialCase := false
+			insideInput, focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
+
+			if insideInput {
+				switch _m.inputs[focusedIE].(type) {
+				case *components.TextInput:
+					switch msg.String() {
+					case "j":
+						updateModel(&cmds, &_m.inputs[focusedIE], msg)
+						specialCase = true
+					}
+				}
+			}
+
+			if specialCase {
+				break
+			}
+
 			_m.navigateDown()
 			uiNavigate = true
-		case "up", "ctrl+p", "tab":
+		case "up", "ctrl+p", "tab", "k":
 			isUiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
+
 			if !isUiScreen {
+				break
+			}
+
+			specialCase := false
+			insideInput, focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
+
+			if insideInput {
+				switch _m.inputs[focusedIE].(type) {
+				case *components.TextInput:
+					switch msg.String() {
+					case "k":
+						updateModel(&cmds, &_m.inputs[focusedIE], msg)
+						specialCase = true
+					}
+				}
+			}
+
+			if specialCase {
 				break
 			}
 
@@ -694,30 +966,6 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
-			inputI := _m.toInputIE(_m.currentScreen, _m.selected)
-
-			exoticNavigation := true
-
-			switch {
-			default:
-				exoticNavigation = false
-
-			case uiScreen && !inputScreen && msg.String() == "j":
-				fallthrough
-			case inputScreen && (inputI != lettersIE) && msg.String() == "j":
-				_m.navigateDown()
-
-			case uiScreen && !inputScreen && msg.String() == "k":
-				fallthrough
-			case inputScreen && (inputI != lettersIE) && msg.String() == "k":
-				_m.navigateUp()
-			}
-
-			if exoticNavigation {
-				uiNavigate = true
-				break
-			}
-
 			if !inputScreen {
 				break
 			}
@@ -727,7 +975,11 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return _m, tea.Batch(cmds...)
 			}
 
-			focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
+			insideInput, focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
+			if !insideInput {
+				break
+			}
+
 			doDefaultUpdate := true
 
 			switch input := _m.inputs[focusedInputE].(type) {
@@ -773,10 +1025,16 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 
-		focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
-		updateModel(&cmds, &_m.inputs[focusedInputE], msg)
+		insideInput, focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
+		if insideInput {
+			updateModel(&cmds, &_m.inputs[focusedInputE], msg)
+		}
 
 		_m.updateInputUI()
+		return _m, tea.Batch(cmds...)
+	}
+
+	if doNoOP {
 		return _m, tea.Batch(cmds...)
 	}
 
@@ -788,14 +1046,12 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	defer _m.updateInputUI()
 	if uiNavigate {
 		for i := range inputMaxIdx + 1 {
-			inputE := _m.toInputIE(_m.currentScreen, i)
+			_, inputE := _m.toInputIE(_m.currentScreen, i)
 			_m.inputs[inputE].Blur()
 		}
 
-		inputs := _m.renderedInputIndexes(_m.currentScreen)
-		if _m.selected <= inputs[len(inputs)-1] {
-			focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
-
+		insideInput, focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
+		if insideInput {
 			cmd := _m.inputs[focusedInputE].Focus()
 			cmds = append(cmds, cmd)
 		}
@@ -884,7 +1140,6 @@ func (_m *dihdahModel) updateInputUI() {
 		return
 	}
 
-	// TODO: (and NOTE that) Level field can change inputs
 	switch _m.currentScreen {
 	case encodeOptScreen:
 		customChecked := _m.inputs[encode__custom_IE.toInputEnum()].Value().(bool)
@@ -991,25 +1246,25 @@ func inputsRawMaxIdx(currentScreen screenEnum) (isInputScreen bool, maxIdx int) 
 	return isInputScreen, maxIdx
 }
 
-func (_m dihdahModel) toInputIE(currentScreen screenEnum, localInputE int) inputsE {
-	inputE := 0
+func (_m dihdahModel) toInputIE(currentScreen screenEnum, localInputE int) (insideInput bool, inputE inputsE) {
+	inputE = 0
 	inputs := _m.renderedInputIndexes(currentScreen)
 	if len(inputs) == 0 || localInputE > inputs[len(inputs)-1] {
-		return 0
+		return false, inputE
 	}
 
 	switch currentScreen {
 	case encodeOptScreen:
-		inputE = int(encodeIE(localInputE).toInputEnum())
+		inputE = encodeIE(localInputE).toInputEnum()
 	case decodeLetterOptScreen:
-		inputE = int(decodeLettersIE(localInputE).toInputEnum())
+		inputE = decodeLettersIE(localInputE).toInputEnum()
 	case decodeWordOptScreen:
-		inputE = int(decodeWordsIE(localInputE).toInputEnum())
+		inputE = decodeWordsIE(localInputE).toInputEnum()
 	case decodeQuoteOptScreen:
-		inputE = int(decodeQuotesIE(localInputE).toInputEnum())
+		inputE = decodeQuotesIE(localInputE).toInputEnum()
 	}
 
-	return inputsE(inputE)
+	return true, inputE
 }
 
 func renderOpts(options []string, selected int) string {
@@ -1057,6 +1312,15 @@ func renderInputs(realInputs []components.Input, fields []inputField) string {
 func (_m *dihdahModel) View() string {
 	isHelp := true
 	helpViewTopic := ""
+
+	insideInput, focusedIdx := _m.toInputIE(_m.currentScreen, _m.selected)
+
+	if insideInput && focusedIdx == fileNameIE {
+		filePicker := _m.inputs[fileNameIE].(*components.FilePicker)
+		if filePicker.SelectingFile {
+			return filePicker.View()
+		}
+	}
 
 	switch _m.currentScreen {
 	case mainHelp:

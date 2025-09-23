@@ -58,7 +58,7 @@ var QuoteCmd = &cobra.Command{
 			return fmt.Errorf("Speed must not be zero.")
 		}
 
-		p := tea.NewProgram(newQuoteModel(randomQuote, speed))
+		p := tea.NewProgram(NewQuoteModel(randomQuote, speed, nil))
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("Error running the program: %v", err)
 		}
