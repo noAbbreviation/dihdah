@@ -225,17 +225,26 @@ func viewPortInitContent(viewport *viewport.Model, text *string) {
 }
 
 func validateLetters(s string) error {
-	for _, r := range s {
-		if r <= 'a' && r >= 'z' {
-			return nil
+	validLettersCount := 0
+	if len(s) < 3 {
+		return fmt.Errorf("Essentially has no input")
+	}
+
+	for _, r := range encode.DedupLetters(s) {
+		if r >= 'a' && r <= 'z' {
+			validLettersCount += 1
 		}
 
-		if r <= 'A' && r >= 'Z' {
-			return nil
+		if r >= 'A' && r <= 'Z' {
+			validLettersCount += 1
 		}
 	}
 
-	return fmt.Errorf("Essentially has no input")
+	if validLettersCount < 3 {
+		return fmt.Errorf("Essentially has no input")
+	}
+
+	return nil
 }
 
 func newDihdahModel() *dihdahModel {
@@ -304,7 +313,30 @@ func newDihdahModel() *dihdahModel {
 	}
 }
 
-// TODO: Update iteration function for better granularity
+func (_m dihdahModel) letterLevelUpdate() {
+	levelArg := int(_m.inputs[letterLevelIE].Value().(float64))
+	lettersPerLevel := encode.NewLettersPerLevel
+
+	levelArg = min(levelArg, len(lettersPerLevel))
+
+	letters := ""
+	for _, newLetters := range lettersPerLevel[:levelArg] {
+		letters += newLetters
+	}
+
+	dedupedLetters := encode.DedupLetters(letters)
+	_m.inputs[lettersIE].SetValue(dedupedLetters)
+
+	iterations := max(float64(len(dedupedLetters)/2), 3)
+	_m.inputs[iterationsIE].SetValue(iterations)
+}
+
+func (_m dihdahModel) wordLevelUpdate() {
+	levelArg := int(_m.inputs[wordLevelIE].Value().(float64))
+
+	wordLength := decode.MaxWordLenPerLevel[levelArg-1]
+	_m.inputs[maxWordLengthIE].SetValue(float64(wordLength))
+}
 
 func initInputs() []components.Input {
 	inputs := make([]components.Input, fileNameIE+1)
@@ -370,6 +402,7 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	uiNavigate := false
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		_m.helpViewPort.Width = min(msg.Width, viewPortWidth)
@@ -378,14 +411,42 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		_m.helpViewPort.SetContent(lipgloss.NewStyle().Width(_m.helpViewPort.Width).Render(*_m.helpText))
 	case tea.KeyMsg:
-		// TODO: Special keymsg cases would want to fallthrough to input handling pipeline
 		switch msg.String() {
-		case "esc":
+		case "esc", "backspace", "h", "left", "H", "shift+left":
 			if _m.currentScreen == mainScreen {
 				return _m, tea.Quit
 			}
 
+			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
+			if inputScreen {
+				specialCase := false
+				focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
+
+				switch input := _m.inputs[focusedIE].(type) {
+				case *components.TextInput:
+					switch msg.String() {
+					case "h", "H", "backspace":
+						updateModel(&cmds, &_m.inputs[focusedIE], msg)
+						specialCase = true
+					}
+
+				case *components.Number:
+					switch msg.String() {
+					case "h", "left":
+						input.Decrement()
+						specialCase = true
+					}
+				}
+
+				if specialCase {
+					break
+				}
+			}
+
+			doNoOP := false
 			switch _m.currentScreen {
+			default:
+				doNoOP = true
 			case mainHelp:
 				_m.currentScreen = mainScreen
 
@@ -414,14 +475,12 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				_m.currentScreen = decodeScreen
 			}
 
-			isUiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
-			if !isUiScreen {
-				_m.selected = 0
+			if doNoOP {
 				break
 			}
 
-			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
-			if !inputScreen {
+			freshInputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
+			if !freshInputScreen {
 				_m.selected = 0
 				break
 			}
@@ -430,11 +489,46 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_m.selected = indexes[0]
 
 			uiNavigate = true
-		case "enter":
+		case "enter", " ", "l", "right", "L", "shift+right":
 			isUiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
 			if !isUiScreen {
 				break
 			}
+
+			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
+			if inputScreen {
+				specialCase := false
+				focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
+
+				switch input := _m.inputs[focusedIE].(type) {
+				case *components.Checkbox:
+					switch msg.String() {
+					case "enter", " ":
+						input.Toggle()
+						specialCase = true
+					}
+
+				case *components.TextInput:
+					switch msg.String() {
+					case "l", "L":
+						updateModel(&cmds, &_m.inputs[focusedIE], msg)
+						specialCase = true
+					}
+
+				case *components.Number:
+					switch msg.String() {
+					case "l", "right":
+						input.Increment()
+						specialCase = true
+					}
+				}
+
+				if specialCase {
+					break
+				}
+			}
+
+			doNoOP := false
 
 			switch _m.currentScreen {
 			case encodeOptScreen:
@@ -442,6 +536,9 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				lastIdx := indexes[len(indexes)-1]
 
 				switch _m.selected {
+				default:
+					doNoOP = true
+
 				case lastIdx + backButtonOffset:
 					_m.currentScreen = mainScreen
 
@@ -460,6 +557,9 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				lastIdx := indexes[len(indexes)-1]
 
 				switch _m.selected {
+				default:
+					doNoOP = true
+
 				case lastIdx + backButtonOffset:
 					_m.currentScreen = decodeScreen
 
@@ -478,6 +578,9 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				lastIdx := indexes[len(indexes)-1]
 
 				switch _m.selected {
+				default:
+					doNoOP = true
+
 				case lastIdx + backButtonOffset:
 					_m.currentScreen = decodeScreen
 
@@ -496,6 +599,9 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				lastIdx := indexes[len(indexes)-1]
 
 				switch _m.selected {
+				default:
+					doNoOP = true
+
 				case lastIdx + backButtonOffset:
 					_m.currentScreen = decodeScreen
 
@@ -511,6 +617,9 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case mainScreen:
 				switch mainScreenOpts(_m.selected) {
+				default:
+					doNoOP = true
+
 				case encodeSelectM:
 					_m.currentScreen = encodeOptScreen
 				case decodeSelectM:
@@ -520,14 +629,15 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					viewPortInitContent(&_m.helpViewPort, &helpText)
 					_m.helpText = &helpText
 					_m.currentScreen = mainHelp
-				default:
-					fallthrough
 				case quitSelectM:
 					return _m, tea.Quit
 				}
 
 			case decodeScreen:
 				switch decodeScreenOpts(_m.selected) {
+				default:
+					doNoOP = true
+
 				case decodeLetterSelectD:
 					_m.currentScreen = decodeLetterOptScreen
 				case decodeWordSelectD:
@@ -541,15 +651,17 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					viewPortInitContent(&_m.helpViewPort, &helpText)
 					_m.currentScreen = decodeHelp
 
-				default:
-					fallthrough
 				case backSelectD:
 					_m.currentScreen = mainScreen
 				}
 			}
 
-			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
-			if !inputScreen {
+			if doNoOP {
+				break
+			}
+
+			freshInputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
+			if !freshInputScreen {
 				_m.selected = 0
 				break
 			}
@@ -641,6 +753,14 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				updateModel(&cmds, &_m.inputs[focusedInputE], msg)
 			}
 
+			switch focusedInputE {
+			case letterLevelIE:
+				_m.letterLevelUpdate()
+
+			case wordLevelIE:
+				_m.wordLevelUpdate()
+			}
+
 			_m.updateInputUI()
 		}
 	default:
@@ -665,6 +785,7 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return _m, tea.Batch(cmds...)
 	}
 
+	defer _m.updateInputUI()
 	if uiNavigate {
 		for i := range inputMaxIdx + 1 {
 			inputE := _m.toInputIE(_m.currentScreen, i)
@@ -678,8 +799,6 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd := _m.inputs[focusedInputE].Focus()
 			cmds = append(cmds, cmd)
 		}
-
-		_m.updateInputUI()
 	}
 
 	return _m, tea.Batch(cmds...)
@@ -826,9 +945,9 @@ func (_m *dihdahModel) renderedInputIndexes(currentScreen screenEnum) []int {
 	return indexes
 }
 
-func (_m *dihdahModel) uiMaxIndex(currentScreen screenEnum) (bool, int) {
-	isUiScreen := true
-	maxIdx := 0
+func (_m *dihdahModel) uiMaxIndex(currentScreen screenEnum) (isUiScreen bool, maxIdx int) {
+	maxIdx = 0
+	isUiScreen = true
 
 	switch currentScreen {
 	default:
@@ -852,9 +971,9 @@ func (_m *dihdahModel) uiMaxIndex(currentScreen screenEnum) (bool, int) {
 	return isUiScreen, maxIdx
 }
 
-func inputsRawMaxIdx(currentScreen screenEnum) (bool, int) {
-	maxIdx := 0
-	isInputScreen := true
+func inputsRawMaxIdx(currentScreen screenEnum) (isInputScreen bool, maxIdx int) {
+	maxIdx = 0
+	isInputScreen = true
 
 	switch currentScreen {
 	default:

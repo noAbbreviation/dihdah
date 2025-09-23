@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var newLettersPerLevel = [...]string{
+var NewLettersPerLevel = [...]string{
 	"the",
 	"dog",
 	"brown",
@@ -25,7 +25,7 @@ func init() {
 
 	Cmd.Flags().Uint16P("level", "l", 0, fmt.Sprintf(
 		"Level to use for training. Each level adds 3-5 new letters for training. Max level: %v",
-		len(newLettersPerLevel),
+		len(NewLettersPerLevel),
 	))
 	Cmd.Flags().String("letters", "", "Custom alphabet pool to train. You probably should start by using --level.")
 
@@ -65,9 +65,9 @@ var Cmd = &cobra.Command{
 		if len(letters) == 0 {
 			levelArg, _ := cmd.Flags().GetUint16("level")
 
-			if int(levelArg) > len(newLettersPerLevel) {
-				cmd.PrintErrf("Warning: Level is at most %v. Will be set to max.\n", len(newLettersPerLevel))
-				levelArg = uint16(len(newLettersPerLevel))
+			if int(levelArg) > len(NewLettersPerLevel) {
+				cmd.PrintErrf("Warning: Level is at most %v. Will be set to max.\n", len(NewLettersPerLevel))
+				levelArg = uint16(len(NewLettersPerLevel))
 			}
 
 			if levelArg == 0 {
@@ -75,11 +75,11 @@ var Cmd = &cobra.Command{
 			}
 
 			for i := range levelArg {
-				letters += newLettersPerLevel[i]
+				letters += NewLettersPerLevel[i]
 			}
 		}
 
-		dedupedLetters := dedupLetters(letters)
+		dedupedLetters := DedupLetters(letters)
 
 		doAllLetters, _ := cmd.Flags().GetBool("recap")
 		if doAllLetters {
@@ -166,7 +166,7 @@ NOTES:
     run --level with --recap before proceeding with the next --level.`,
 }
 
-func dedupLetters(str string) string {
+func DedupLetters(str string) string {
 	runes := []rune(str)
 	firstLetter := runes[0]
 

@@ -28,7 +28,7 @@ func (m *TextInput) View() string {
 		invalidHighlight = m.InvalidHighlight
 	}
 
-	return fmt.Sprintf("%v%v%v", invalidHighlight, m.Input.View(), invalidHighlight)
+	return fmt.Sprintf("%v %v %v", invalidHighlight, m.Input.View(), invalidHighlight)
 }
 
 // Returns a wrapped string

@@ -108,7 +108,6 @@ func (_m *letterModel) Init() tea.Cmd {
 }
 
 type quitMsg struct{}
-type replayMsg struct{}
 
 func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	drill := _m.drill

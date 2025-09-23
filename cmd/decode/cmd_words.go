@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var maxWordLenPerLevel = [...]int{
+var MaxWordLenPerLevel = [...]int{
 	5,
 	7,
 	10,
@@ -27,7 +27,7 @@ func init() {
 
 	WordCmd.Flags().Uint16P("level", "l", 0,
 		"Level to have for training. Each level increases the length of the word available."+
-			fmt.Sprintf(" Max: %v", len(maxWordLenPerLevel)),
+			fmt.Sprintf(" Max: %v", len(MaxWordLenPerLevel)),
 	)
 
 	WordCmd.Flags().String("words", "", "Custom word file to train on. You probably should start by using --level.")
@@ -53,12 +53,12 @@ var WordCmd = &cobra.Command{
 				return fmt.Errorf("--level and --w-length are both set to zero.\n")
 			}
 
-			if int(levelArg) > len(maxWordLenPerLevel) {
-				cmd.PrintErrf("Warning: Max level for decoding words is %v.\n", len(maxWordLenPerLevel))
-				levelArg = uint16(len(maxWordLenPerLevel))
+			if int(levelArg) > len(MaxWordLenPerLevel) {
+				cmd.PrintErrf("Warning: Max level for decoding words is %v.\n", len(MaxWordLenPerLevel))
+				levelArg = uint16(len(MaxWordLenPerLevel))
 			}
 
-			wordLength = uint16(maxWordLenPerLevel[levelArg-1])
+			wordLength = uint16(MaxWordLenPerLevel[levelArg-1])
 		}
 
 		wordFile, _ := cmd.Flags().GetString("words")
@@ -98,7 +98,7 @@ var WordCmd = &cobra.Command{
 				return -1
 			}, word)
 
-			if len(word) <= int(wordLength) || int(wordLength) >= len(maxWordLenPerLevel) {
+			if len(word) <= int(wordLength) || int(wordLength) >= len(MaxWordLenPerLevel) {
 				wordPool = append(wordPool, word)
 			}
 		}
