@@ -41,21 +41,20 @@ const (
 	mainScreen screenEnum = iota
 	mainHelp
 
-	encodeScreen
+	encodeOptScreen
 	encodeHelp
 
 	decodeScreen
-	decodeOptScreen
 	decodeHelp
 
-	decodeLHelp
-	decodeWHelp
-	decodeQHelp
-
-	encodeOptScreen
 	decodeLetterOptScreen
+	decodeLHelp
+
 	decodeWordOptScreen
+	decodeWHelp
+
 	decodeQuoteOptScreen
+	decodeQHelp
 )
 
 type mainScreenOpts int
@@ -67,14 +66,6 @@ const (
 	quitSelectM
 )
 
-type encodeScreenOpts int
-
-const (
-	encodeSelectE encodeScreenOpts = iota
-	helpSelectE
-	backSelectE
-)
-
 type decodeScreenOpts int
 
 const (
@@ -83,10 +74,6 @@ const (
 	decodeQuoteSelectD
 
 	decodeHelpSelectD
-	decodeLetterHelpSelectD
-	decodeWordHelpSelectD
-	decodeQuoteHelpSelectD
-
 	backSelectD
 )
 
@@ -121,6 +108,14 @@ func (input inputsE) String() string {
 	}[input]
 }
 
+const (
+	_ int = iota
+
+	startButtonOffset
+	helpButtonOffset
+	backButtonOffset
+)
+
 type encodeIE int
 
 const (
@@ -131,6 +126,7 @@ const (
 	encode__letters_IE
 
 	encode__start
+	encode__help
 	encode__back
 )
 
@@ -155,14 +151,15 @@ const (
 	decodeLetters__speed_IE
 
 	decodeLetters__start
+	decodeLetters__help
 	decodeLetters__back
 )
 
 func (inputEnum decodeLettersIE) toInputEnum() inputsE {
 	return [...]inputsE{
 		letterLevelIE,
-		recapIE,
 		iterationsIE,
+		recapIE,
 		customIE,
 		lettersIE,
 		speedIE,
@@ -179,6 +176,7 @@ const (
 	decodeWords__speed_IE
 
 	decodeWords__start
+	decodeWords__help
 	decodeWords__back
 )
 
@@ -199,6 +197,7 @@ const (
 	decodeQuotes__quoteFile_IE
 
 	decodeQuotes__start
+	decodeQuotes__help
 	decodeQuotes__back
 )
 
@@ -240,21 +239,21 @@ func newDihdahModel() *dihdahModel {
 		{Prefix: "  Letters to use"}, // Show: customChecked
 	}
 
-	for i := range encode__back - 1 {
+	for i := range encode__back - encodeIE(backButtonOffset) + 1 {
 		encodeFields[i].ReuseIndex = i
 		encodeFields[i].Show = true
 	}
 
 	decodeLetterFields := [...]inputField{
-		{Prefix: "Level"}, // Show: !customChecked
+		{Prefix: "Level"},        // Show: !customChecked
+		{Prefix: "  Iterations"}, // Show: !recapChecked
 		{Prefix: "Recap?"},
-		{Prefix: "Iterations"}, // Show: !recapChecked
 		{Prefix: "Custom letters?"},
 		{Prefix: "  Letters to use"}, // Show: customChecked
 		{Prefix: "Speed", Show: true},
 	}
 
-	for i := range decodeLetters__back - 1 {
+	for i := range decodeLetters__back - decodeLettersIE(backButtonOffset) + 1 {
 		decodeLetterFields[i].ReuseIndex = i
 		decodeLetterFields[i].Show = true
 	}
@@ -267,7 +266,7 @@ func newDihdahModel() *dihdahModel {
 		{Prefix: "Speed"},
 	}
 
-	for i := range decodeWords__back - 1 {
+	for i := range decodeWords__back - decodeWordsIE(backButtonOffset) + 1 {
 		decodeWordFields[i].ReuseIndex = i
 		decodeWordFields[i].Show = true
 	}
@@ -277,7 +276,7 @@ func newDihdahModel() *dihdahModel {
 		{Prefix: "Custom quote file", Show: true},
 	}
 
-	for i := range decodeQuotes__back - 1 {
+	for i := range decodeQuotes__back - decodeQuotesIE(backButtonOffset) + 1 {
 		decodeQuoteFields[i].ReuseIndex = i
 		decodeQuoteFields[i].Show = true
 	}
@@ -293,6 +292,8 @@ func newDihdahModel() *dihdahModel {
 		decodeQuoteFields:  decodeQuoteFields,
 	}
 }
+
+// TODO: Update iteration function for better granularity
 
 func initInputs() []components.Input {
 	inputs := make([]components.Input, fileNameIE+1)
@@ -368,10 +369,9 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		_m.helpViewPort.SetContent(lipgloss.NewStyle().Width(_m.helpViewPort.Width).Render(*_m.helpText))
 	case tea.KeyMsg:
+		// TODO: Special keymsg cases would want to fallthrough to input handling pipeline
 		switch msg.String() {
-		case "backspace", "esc":
-			// TODO: deal with backspace here
-
+		case "esc":
 			if _m.currentScreen == mainScreen {
 				return _m, tea.Quit
 			}
@@ -379,10 +379,11 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch _m.currentScreen {
 			case mainHelp:
 				_m.currentScreen = mainScreen
-			case encodeScreen:
+
+			case encodeOptScreen:
 				_m.currentScreen = mainScreen
 			case encodeHelp:
-				_m.currentScreen = encodeScreen
+				_m.currentScreen = encodeOptScreen
 
 			case decodeScreen:
 				_m.currentScreen = mainScreen
@@ -390,14 +391,12 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				_m.currentScreen = decodeScreen
 
 			case decodeLHelp:
-				_m.currentScreen = decodeScreen
+				_m.currentScreen = decodeLetterOptScreen
 			case decodeWHelp:
-				_m.currentScreen = decodeScreen
+				_m.currentScreen = decodeWordOptScreen
 			case decodeQHelp:
-				_m.currentScreen = decodeScreen
+				_m.currentScreen = decodeQuoteOptScreen
 
-			case encodeOptScreen:
-				_m.currentScreen = encodeScreen
 			case decodeLetterOptScreen:
 				_m.currentScreen = decodeScreen
 			case decodeWordOptScreen:
@@ -406,21 +405,27 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				_m.currentScreen = decodeScreen
 			}
 
-			_m.selected = 0
-			return _m, nil
-		case "enter":
 			isUiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
-
 			if !isUiScreen {
+				_m.selected = 0
 				break
 			}
 
-			const (
-				_ int = iota
+			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
+			if !inputScreen {
+				_m.selected = 0
+				break
+			}
 
-				startButtonOffset
-				backButtonOffset
-			)
+			indexes := _m.renderedInputIndexes(_m.currentScreen)
+			_m.selected = indexes[0]
+
+			uiNavigate = true
+		case "enter":
+			isUiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
+			if !isUiScreen {
+				break
+			}
 
 			switch _m.currentScreen {
 			case encodeOptScreen:
@@ -429,7 +434,14 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				switch _m.selected {
 				case lastIdx + backButtonOffset:
-					_m.currentScreen = encodeScreen
+					_m.currentScreen = mainScreen
+
+				case lastIdx + helpButtonOffset:
+					helpText := encode.Cmd.Long
+					_m.helpText = &helpText
+					viewPortInitContent(&_m.helpViewPort, &helpText)
+					_m.currentScreen = encodeHelp
+
 				case lastIdx + startButtonOffset:
 					// TODO: glue here
 				}
@@ -441,6 +453,13 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch _m.selected {
 				case lastIdx + backButtonOffset:
 					_m.currentScreen = decodeScreen
+
+				case lastIdx + helpButtonOffset:
+					helpText := decode.LetterCmd.Long
+					_m.helpText = &helpText
+					viewPortInitContent(&_m.helpViewPort, &helpText)
+					_m.currentScreen = decodeLHelp
+
 				case lastIdx + startButtonOffset:
 					// TODO: glue here
 				}
@@ -452,6 +471,13 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch _m.selected {
 				case lastIdx + backButtonOffset:
 					_m.currentScreen = decodeScreen
+
+				case lastIdx + helpButtonOffset:
+					helpText := decode.WordCmd.Long
+					_m.helpText = &helpText
+					viewPortInitContent(&_m.helpViewPort, &helpText)
+					_m.currentScreen = decodeWHelp
+
 				case lastIdx + startButtonOffset:
 					// TODO: glue here
 				}
@@ -463,6 +489,13 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch _m.selected {
 				case lastIdx + backButtonOffset:
 					_m.currentScreen = decodeScreen
+
+				case lastIdx + helpButtonOffset:
+					helpText := decode.QuoteCmd.Long
+					_m.helpText = &helpText
+					viewPortInitContent(&_m.helpViewPort, &helpText)
+					_m.currentScreen = decodeQHelp
+
 				case lastIdx + startButtonOffset:
 					// TODO: glue here
 				}
@@ -470,7 +503,7 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case mainScreen:
 				switch mainScreenOpts(_m.selected) {
 				case encodeSelectM:
-					_m.currentScreen = encodeScreen
+					_m.currentScreen = encodeOptScreen
 				case decodeSelectM:
 					_m.currentScreen = decodeScreen
 				case helpSelectM:
@@ -484,62 +517,17 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return _m, tea.Quit
 				}
 
-			case encodeScreen:
-				switch encodeScreenOpts(_m.selected) {
-				case encodeSelectE:
-					_m.currentScreen = encodeOptScreen
-
-					firstInputE := _m.toInputIE(_m.currentScreen, 0)
-					cmds = append(cmds, _m.inputs[firstInputE].Focus())
-				case helpSelectE:
-					helpText := encode.Cmd.Long
-					_m.helpText = &helpText
-					viewPortInitContent(&_m.helpViewPort, &helpText)
-					_m.currentScreen = encodeHelp
-				default:
-					fallthrough
-				case backSelectE:
-					_m.currentScreen = mainScreen
-				}
-
 			case decodeScreen:
 				switch decodeScreenOpts(_m.selected) {
 				case decodeLetterSelectD:
 					_m.currentScreen = decodeLetterOptScreen
-
-					firstInputE := _m.toInputIE(_m.currentScreen, 0)
-					cmds = append(cmds, _m.inputs[firstInputE].Focus())
 				case decodeWordSelectD:
 					_m.currentScreen = decodeWordOptScreen
-
-					firstInputE := _m.toInputIE(_m.currentScreen, 0)
-					cmds = append(cmds, _m.inputs[firstInputE].Focus())
 				case decodeQuoteSelectD:
 					_m.currentScreen = decodeQuoteOptScreen
 
-					firstInputE := _m.toInputIE(_m.currentScreen, 0)
-					cmds = append(cmds, _m.inputs[firstInputE].Focus())
-
 				case decodeHelpSelectD:
 					helpText := decode.Cmd.Long
-					_m.helpText = &helpText
-					viewPortInitContent(&_m.helpViewPort, &helpText)
-					_m.currentScreen = decodeHelp
-
-				case decodeLetterHelpSelectD:
-					helpText := decode.LetterCmd.Long
-					_m.helpText = &helpText
-					viewPortInitContent(&_m.helpViewPort, &helpText)
-					_m.currentScreen = decodeHelp
-
-				case decodeQuoteHelpSelectD:
-					helpText := decode.WordCmd.Long
-					_m.helpText = &helpText
-					viewPortInitContent(&_m.helpViewPort, &helpText)
-					_m.currentScreen = decodeHelp
-
-				case decodeWordHelpSelectD:
-					helpText := decode.QuoteCmd.Long
 					_m.helpText = &helpText
 					viewPortInitContent(&_m.helpViewPort, &helpText)
 					_m.currentScreen = decodeHelp
@@ -551,23 +539,16 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			if isUiScreen {
+			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
+			if !inputScreen {
 				_m.selected = 0
 				break
 			}
 
-			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
-			if !inputScreen {
-				break
-			}
+			indexes := _m.renderedInputIndexes(_m.currentScreen)
+			_m.selected = indexes[0]
 
-			inputIndexes := _m.renderedInputIndexes(_m.currentScreen)
-			_m.selected = inputIndexes[0]
-
-			cmd := _m.inputs[_m.selected].Focus()
-			cmds = append(cmds, cmd)
-
-			_m.updateInputUI()
+			uiNavigate = true
 		case "down", "ctrl+n", "shift+tab":
 			isUiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
 
@@ -575,16 +556,15 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 
-			cmds = append(cmds, _m.navigateDown())
+			_m.navigateDown()
 			uiNavigate = true
 		case "up", "ctrl+p", "tab":
 			isUiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
-
 			if !isUiScreen {
 				break
 			}
 
-			cmds = append(cmds, _m.navigateUp())
+			_m.navigateUp()
 			uiNavigate = true
 		default:
 			uiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
@@ -592,27 +572,24 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 
-			exoticNavigation := true
 			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
 			inputI := _m.toInputIE(_m.currentScreen, _m.selected)
 
+			exoticNavigation := true
+
 			switch {
 			default:
-				cmds = append(cmds, tea.Printf("pressed '%v'", msg.String()))
-				cmds = append(cmds, tea.Printf("inputI: %v", inputI))
-				cmds = append(cmds, tea.Printf("_m.selected: %v", _m.selected))
-
 				exoticNavigation = false
 
 			case uiScreen && !inputScreen && msg.String() == "j":
 				fallthrough
 			case inputScreen && (inputI != lettersIE) && msg.String() == "j":
-				cmds = append(cmds, _m.navigateDown())
+				_m.navigateDown()
 
 			case uiScreen && !inputScreen && msg.String() == "k":
 				fallthrough
 			case inputScreen && (inputI != lettersIE) && msg.String() == "k":
-				cmds = append(cmds, _m.navigateUp())
+				_m.navigateUp()
 			}
 
 			if exoticNavigation {
@@ -694,21 +671,21 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		inputs := _m.renderedInputIndexes(_m.currentScreen)
 		if _m.selected <= inputs[len(inputs)-1] {
 			focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
-			cmds = append(cmds, tea.Printf("focusedInputE: %v", focusedInputE))
 
 			cmd := _m.inputs[focusedInputE].Focus()
 			cmds = append(cmds, cmd)
 		}
+
+		_m.updateInputUI()
 	}
 
-	cmds = append(cmds, tea.Println())
 	return _m, tea.Batch(cmds...)
 }
 
-func (_m *dihdahModel) navigateUp() tea.Cmd {
+func (_m *dihdahModel) navigateUp() {
 	uiScreen, maxIdx := _m.uiMaxIndex(_m.currentScreen)
 	if !uiScreen {
-		return nil
+		return
 	}
 
 	oldSelected := _m.selected
@@ -720,7 +697,7 @@ func (_m *dihdahModel) navigateUp() tea.Cmd {
 
 	inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
 	if !inputScreen {
-		return tea.Printf("_m.selected: %v", _m.selected)
+		return
 	}
 
 	indexes := _m.renderedInputIndexes(_m.currentScreen)
@@ -735,17 +712,12 @@ func (_m *dihdahModel) navigateUp() tea.Cmd {
 
 		_m.selected = indexes[reverseIndex-1]
 	}
-
-	return tea.Sequence(
-		tea.Printf("_m.selected: %v", _m.selected),
-		tea.Printf("indexes: %v", indexes),
-	)
 }
 
-func (_m *dihdahModel) navigateDown() tea.Cmd {
+func (_m *dihdahModel) navigateDown() {
 	uiScreen, maxIdx := _m.uiMaxIndex(_m.currentScreen)
 	if !uiScreen {
-		return nil
+		return
 	}
 
 	oldSelected := _m.selected
@@ -759,13 +731,13 @@ func (_m *dihdahModel) navigateDown() tea.Cmd {
 
 	inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
 	if !inputScreen {
-		return tea.Printf("_m.selected: %v", _m.selected)
+		return
 	}
 
 	indexes := _m.renderedInputIndexes(_m.currentScreen)
 	if wrappedAround {
 		_m.selected = indexes[0]
-		return tea.Println("wrapped around")
+		return
 	}
 
 	if _m.selected < indexes[len(indexes)-1] {
@@ -778,17 +750,10 @@ func (_m *dihdahModel) navigateDown() tea.Cmd {
 		}
 
 		_m.selected = indexes[reverseIndex+1]
-		return tea.Sequence(
-			tea.Printf("_m.selected: %v", _m.selected),
-			tea.Printf("indexes: %v", indexes),
-		)
+		return
 	}
 
 	_m.selected = max(_m.selected, indexes[len(indexes)-1])
-	return tea.Sequence(
-		tea.Printf("_m.selected: %v", _m.selected),
-		tea.Printf("indexes: %v", indexes),
-	)
 }
 
 func (_m *dihdahModel) updateInputUI() {
@@ -867,8 +832,6 @@ func (_m *dihdahModel) uiMaxIndex(currentScreen screenEnum) (bool, int) {
 		isUiScreen = false
 	case mainScreen:
 		maxIdx = int(quitSelectM)
-	case encodeScreen:
-		maxIdx = int(backSelectE)
 	case decodeScreen:
 		maxIdx = int(backSelectD)
 
@@ -880,7 +843,7 @@ func (_m *dihdahModel) uiMaxIndex(currentScreen screenEnum) (bool, int) {
 		fallthrough
 	case decodeQuoteOptScreen:
 		inputs := _m.renderedInputIndexes(currentScreen)
-		maxIdx = inputs[len(inputs)-1] + 2
+		maxIdx = inputs[len(inputs)-1] + backButtonOffset
 	}
 
 	return isUiScreen, maxIdx
@@ -894,13 +857,13 @@ func inputsRawMaxIdx(currentScreen screenEnum) (bool, int) {
 	default:
 		isInputScreen = false
 	case encodeOptScreen:
-		maxIdx = int(encode__back - 2)
+		maxIdx = int(encode__back) - backButtonOffset
 	case decodeLetterOptScreen:
-		maxIdx = int(decodeLetters__back - 2)
+		maxIdx = int(decodeLetters__back) - backButtonOffset
 	case decodeWordOptScreen:
-		maxIdx = int(decodeWords__back - 2)
+		maxIdx = int(decodeWords__back) - backButtonOffset
 	case decodeQuoteOptScreen:
-		maxIdx = int(decodeQuotes__back - 2)
+		maxIdx = int(decodeQuotes__back) - backButtonOffset
 	}
 
 	return isInputScreen, maxIdx
@@ -1031,6 +994,7 @@ func (_m *dihdahModel) View() string {
 		offsettedSelected := _m.selected - (indexes[len(indexes)-1] + 1)
 		renderedCommonOpts := renderOpts([]string{
 			"Start training",
+			"Help",
 			"Back",
 		}, offsettedSelected)
 
@@ -1062,23 +1026,12 @@ func (_m *dihdahModel) View() string {
 		}, _m.selected)
 		screenHeader = "Dihdah (github.com/noAbbreviation/dihdah)"
 
-	case encodeScreen:
-		renderedOptions = renderOpts([]string{
-			"Start encode training",
-			"Help page",
-			"Back to main menu",
-		}, _m.selected)
-		screenHeader = "Dihdah: Encode training"
-
 	case decodeScreen:
 		renderedOptions = renderOpts([]string{
 			"Start letter decode training",
 			"Start word decode training",
 			"Start quote decode training",
 			"Help page for decode training",
-			"Help page for letter decode training",
-			"Help page for word decode training",
-			"Help page for quote decode training",
 			"Back to main menu",
 		}, _m.selected)
 		screenHeader = "Dihdah: Decode training"
