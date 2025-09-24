@@ -457,14 +457,9 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return _m, tea.Quit
 			}
 
-			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
-			if inputScreen {
+			insideInput, focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
+			if insideInput {
 				specialCase := false
-				insideInput, focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
-
-				if !insideInput {
-					goto afterSpecialBackChecks
-				}
 
 				switch input := _m.inputs[focusedIE].(type) {
 				case *components.TextInput:
@@ -489,7 +484,6 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 
-			afterSpecialBackChecks:
 				if specialCase {
 					break
 				}
@@ -547,14 +541,9 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 
-			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
-			if inputScreen {
+			insideInput, focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
+			if insideInput {
 				specialCase := false
-				insideInput, focusedIE := _m.toInputIE(_m.currentScreen, _m.selected)
-
-				if !insideInput {
-					goto afterSpecialForwardChecks
-				}
 
 				switch input := _m.inputs[focusedIE].(type) {
 				case *components.Checkbox:
@@ -586,7 +575,6 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 
-			afterSpecialForwardChecks:
 				if specialCase {
 					break
 				}
@@ -1008,21 +996,6 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_m.navigateUp()
 			uiNavigate = true
 		default:
-			uiScreen, _ := _m.uiMaxIndex(_m.currentScreen)
-			if !uiScreen {
-				break
-			}
-
-			inputScreen, _ := inputsRawMaxIdx(_m.currentScreen)
-			if !inputScreen {
-				break
-			}
-
-			inputs := _m.renderedInputIndexes(_m.currentScreen)
-			if _m.selected > inputs[len(inputs)-1] {
-				return _m, tea.Batch(cmds...)
-			}
-
 			insideInput, focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
 			if !insideInput {
 				break
@@ -1054,15 +1027,6 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	default:
-		inputScreen, inputMaxIdx := inputsRawMaxIdx(_m.currentScreen)
-		if !inputScreen {
-			break
-		}
-
-		if _m.selected > inputMaxIdx {
-			break
-		}
-
 		insideInput, focusedInputE := _m.toInputIE(_m.currentScreen, _m.selected)
 		if insideInput {
 			updateInput(&cmds, &_m.inputs[focusedInputE], msg)
