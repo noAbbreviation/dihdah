@@ -14,6 +14,8 @@ type Checkbox struct {
 
 	Cursor  cursor.Model
 	focused bool
+
+	reacted bool
 }
 
 func NewCheckBox(checked bool) *Checkbox {
@@ -40,14 +42,17 @@ func (m *Checkbox) Blur() {
 
 func (m *Checkbox) Toggle() {
 	m.checked = !m.checked
+	m.reacted = true
 }
 
 func (m *Checkbox) SetChecked() {
 	m.checked = true
+	m.reacted = true
 }
 
 func (m *Checkbox) SetUnchecked() {
 	m.checked = false
+	m.reacted = true
 }
 
 // Returns a wrapped bool
@@ -62,11 +67,14 @@ func (m *Checkbox) SetValue(checked InputValue) error {
 	}
 
 	m.checked = value
+	m.reacted = true
+
 	return nil
 }
 
 func (m *Checkbox) Reset() {
 	m.SetUnchecked()
+	m.reacted = true
 }
 
 func (m *Checkbox) Init() tea.Cmd {
@@ -86,6 +94,7 @@ func (m *Checkbox) update(msg tea.Msg) (*Checkbox, tea.Cmd) {
 	case tea.KeyMsg:
 		if msg.String() == " " {
 			m.Toggle()
+			m.reacted = true
 		}
 	}
 
@@ -101,4 +110,12 @@ func (m *Checkbox) View() string {
 	}
 
 	return fmt.Sprintf("[%v]%v", m.UncheckedSymbol, m.Cursor.View())
+}
+
+func (m *Checkbox) HasReacted() bool {
+	return m.reacted
+}
+
+func (m *Checkbox) ReactFlush() {
+	m.reacted = false
 }

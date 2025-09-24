@@ -23,6 +23,8 @@ type FilePicker struct {
 
 	Cursor  cursor.Model
 	focused bool
+
+	reacted bool
 }
 
 func NewFilePicker(width int, allowedTypes ...string) *FilePicker {
@@ -89,12 +91,14 @@ func (m *FilePicker) SetValue(filePath InputValue) error {
 	m.setViewportContent(fmt.Sprintf(" ../%v ", displayedFilePath))
 	m.picker.Path = filepath.Clean(value)
 
+	m.setReact()
 	return nil
 }
 
 func (m *FilePicker) Reset() {
 	m.picker = newInternalFilePicker(m.allowedTypes)
 	m.viewport.SetContent("")
+	m.setReact()
 }
 
 func (m *FilePicker) Init() tea.Cmd {
@@ -107,6 +111,8 @@ func (m *FilePicker) Update(msg tea.Msg) (Input, tea.Cmd) {
 
 func (m *FilePicker) update(msg tea.Msg) (*FilePicker, tea.Cmd) {
 	if m.SelectingFile {
+		m.setReact()
+
 		if msg, isKey := msg.(tea.KeyMsg); isKey {
 			if msg.String() == "esc" {
 				m.SelectingFile = false
@@ -131,6 +137,8 @@ func (m *FilePicker) update(msg tea.Msg) (*FilePicker, tea.Cmd) {
 	if !m.focused {
 		return m, nil
 	}
+
+	m.setReact()
 
 	switch msg := msg.(type) {
 	default:
@@ -183,4 +191,16 @@ func (m *FilePicker) View() string {
 		fmt.Sprintf("current path: %v", m.picker.CurrentDirectory),
 		"(file picker) (up/down to navigate, enter to confirm choice, backspace to go back one directory, escape to cancel)",
 	)
+}
+
+func (m *FilePicker) HasReacted() bool {
+	return m.reacted
+}
+
+func (m *FilePicker) ReactFlush() {
+	m.reacted = false
+}
+
+func (m *FilePicker) setReact() {
+	m.reacted = true
 }

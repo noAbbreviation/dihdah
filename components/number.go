@@ -23,6 +23,8 @@ type Number struct {
 
 	Cursor  cursor.Model
 	focused bool
+
+	reacted bool
 }
 
 // Copied from the golang standard library "math" package
@@ -71,6 +73,7 @@ func NewNumber(minValue float64, maxValue float64) *Number {
 // Sets to default value
 func (m *Number) Reset() {
 	m.SetValue(m.Default)
+	m.reacted = true
 }
 
 // Returns a wrapped float64
@@ -87,11 +90,13 @@ func (m *Number) SetValue(value InputValue) error {
 	m.value = num
 	m.ClampValue()
 
+	m.reacted = true
 	return nil
 }
 
 func (m *Number) ClampValue() {
 	m.value = clamp(m.value, m.max, m.min)
+	m.reacted = true
 }
 
 func clamp(value float64, _max float64, _min float64) float64 {
@@ -120,6 +125,8 @@ func (m *Number) Increment() {
 
 	m.value += m.delta
 	m.ClampValue()
+
+	m.reacted = true
 }
 
 func (m *Number) Decrement() {
@@ -129,6 +136,8 @@ func (m *Number) Decrement() {
 
 	m.value -= m.delta
 	m.ClampValue()
+
+	m.reacted = true
 }
 
 func (m *Number) SetDelta(delta float64) {
@@ -169,6 +178,8 @@ func (m *Number) update(msg tea.Msg) (*Number, tea.Cmd) {
 		return m, nil
 	}
 
+	_reacted := true
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -176,10 +187,13 @@ func (m *Number) update(msg tea.Msg) (*Number, tea.Cmd) {
 			m.Increment()
 		case "-":
 			m.Decrement()
+		default:
+			_reacted = false
 		}
 
 	case tea.MouseMsg:
 		if msg.Action != tea.MouseActionPress {
+			_reacted = false
 			break
 		}
 
@@ -188,8 +202,14 @@ func (m *Number) update(msg tea.Msg) (*Number, tea.Cmd) {
 			m.Increment()
 		case tea.MouseButtonWheelDown:
 			m.Decrement()
+		default:
+			_reacted = false
 		}
+	default:
+		_reacted = false
 	}
+
+	m.reacted = _reacted
 
 	var cmd tea.Cmd
 	m.Cursor, cmd = m.Cursor.Update(msg)
@@ -215,4 +235,12 @@ func (m Number) View() string {
 	}
 
 	return viewStr
+}
+
+func (m *Number) HasReacted() bool {
+	return m.reacted
+}
+
+func (m *Number) ReactFlush() {
+	m.reacted = false
 }

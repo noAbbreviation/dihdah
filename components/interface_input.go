@@ -21,4 +21,14 @@ type Input interface {
 	Reset()
 }
 
+type Reactor interface {
+	HasReacted() bool
+	ReactFlush()
+}
+
+type InputReactor interface {
+	Input
+	Reactor
+}
+
 type InputValue any
