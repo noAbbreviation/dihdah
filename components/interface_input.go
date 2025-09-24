@@ -21,4 +21,4 @@ type Input interface {
 	Reset()
 }
 
-type InputValue interface{}
+type InputValue any
