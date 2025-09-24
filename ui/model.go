@@ -605,6 +605,11 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 
 					letters := lettersInput.Value()
+					if len(letters) == 0 {
+						doNoOP = true
+						break
+					}
+
 					dedupedLetters := encode.DedupCleanLetters(letters)
 					runes := []rune(dedupedLetters)
 
@@ -1392,7 +1397,7 @@ func (_m *dihdahModel) View() string {
 			"",
 			renderedCommonOpts,
 			"",
-			"(training options) (up/down to navigate, left/right to change numbers, space to toggle, ctrl+r to reset selection)",
+			"(training options) (up/down to navigate, left/right to change numbers, space to toggle, ctrl+r to reset current input)",
 			"",
 		)
 	}
