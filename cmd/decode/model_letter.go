@@ -2,7 +2,8 @@ package decode
 
 import (
 	"fmt"
-	"time"
+	"slices"
+	"strconv"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -14,7 +15,8 @@ import (
 )
 
 type letterModel struct {
-	backReference tea.Model
+	backReference    tea.Model
+	wrongRightSorted bool
 
 	drill       *commons.Drill
 	lettersUsed string
@@ -22,6 +24,7 @@ type letterModel struct {
 
 	input        textinput.Model
 	resultsTable table.Model
+	rows         []table.Row
 
 	userAnswers []rune
 	showResults bool
@@ -29,6 +32,7 @@ type letterModel struct {
 
 	charPlayer   chan<- rune
 	replaySignal chan<- struct{}
+	killSignal   chan<- struct{}
 }
 
 func NewLetterModel(trainingLetters string, lettersUsed string, speed float64, backRef tea.Model) *letterModel {
@@ -55,23 +59,31 @@ func NewLetterModel(trainingLetters string, lettersUsed string, speed float64, b
 
 type doneMsg struct{}
 
-func initPlayingMorseCode(speed float64) (tea.Cmd, chan<- rune, chan<- struct{}) {
-	replaySignal := make(chan struct{}, 16)
-	newChar := make(chan rune, 16)
+func initPlayingMorseCode(speed float64) (
+	playingCmd tea.Cmd,
+	newChar chan<- rune,
+	replaySignal chan<- struct{},
+	killSignal chan<- struct{},
+) {
+	_replaySignal := make(chan struct{}, 16)
+	_killSignal := make(chan struct{}, 16)
+	_newChar := make(chan rune, 16)
 
 	mixer := &beep.Mixer{}
 	var currentSound *beep.Buffer
 
-	playingCmd := func() tea.Msg {
+	playingCmd = func() tea.Msg {
 		speaker.Play(mixer)
 
 		for {
 			select {
-			case c, ok := <-newChar:
-				if !ok {
-					return doneMsg{}
-				}
+			case <-_killSignal:
+				return doneMsg{}
+			default:
+			}
 
+			select {
+			case c := <-_newChar:
 				morseCode := commons.MorseCodeLookup[c]
 				currentStreamer := commons.MorseCharSound(morseCode, speed)
 
@@ -83,7 +95,7 @@ func initPlayingMorseCode(speed float64) (tea.Cmd, chan<- rune, chan<- struct{})
 			}
 
 			select {
-			case <-replaySignal:
+			case <-_replaySignal:
 				speaker.Lock()
 
 				mixer.Clear()
@@ -97,12 +109,12 @@ func initPlayingMorseCode(speed float64) (tea.Cmd, chan<- rune, chan<- struct{})
 		}
 	}
 
-	return playingCmd, newChar, replaySignal
+	return playingCmd, _newChar, _replaySignal, _killSignal
 }
 
 func (_m *letterModel) Init() tea.Cmd {
 	var playingCmd tea.Cmd
-	playingCmd, _m.charPlayer, _m.replaySignal = initPlayingMorseCode(_m.speed)
+	playingCmd, _m.charPlayer, _m.replaySignal, _m.killSignal = initPlayingMorseCode(_m.speed)
 
 	_m.charPlayer <- rune(_m.drill.Text[_m.drill.Current])
 	_m.replaySignal <- struct{}{}
@@ -123,6 +135,7 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return _m, tea.Quit
 			}
 
+			close(_m.killSignal)
 			return _m.backReference, nil
 		case "ctrl+c":
 			return _m, tea.Quit
@@ -137,7 +150,10 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return _m, tea.Quit
 				}
 
+				close(_m.killSignal)
 				return _m.backReference, nil
+			case "s":
+				_m.resultsTable = _m.toggleSorted()
 			}
 		}
 
@@ -195,8 +211,12 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if drill.Current >= len(drill.Text) {
 				close(_m.charPlayer)
+				_m.killSignal <- struct{}{}
 
-				_m.resultsTable = _m.initResultsTable()
+				_m.rows = _m.initResultsTable()
+				_m.wrongRightSorted = true
+				_m.resultsTable = _m.toggleSorted()
+
 				_m.score, _ = countCorrectLetters(drill.Text, drill.Correct)
 				_m.showResults = true
 
@@ -209,12 +229,6 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			return _m, nil
 		}
-
-	case doneMsg:
-		return _m, tea.Tick(time.Second*3, func(_ time.Time) tea.Msg {
-			return quitMsg{}
-		})
-
 	case quitMsg:
 		return _m, tea.Quit
 	}
@@ -225,7 +239,49 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return _m, cmd
 }
 
-func (_m letterModel) initResultsTable() table.Model {
+func (_m *letterModel) toggleSorted() table.Model {
+	_m.wrongRightSorted = !_m.wrongRightSorted
+
+	if _m.wrongRightSorted {
+		slices.SortFunc(_m.rows, compareCorrectsThenNums)
+	} else {
+		slices.SortFunc(_m.rows, compareRowNums)
+	}
+
+	return table.New(
+		table.WithFocused(true),
+		table.WithColumns(letterResultsColumns),
+		table.WithRows(_m.rows),
+		table.WithHeight(min(10, len(_m.rows)+1)),
+	)
+}
+
+func compareCorrectsThenNums(rowA, rowB table.Row) int {
+	correctStrIdx := 3
+	if rowA[correctStrIdx] != rowB[correctStrIdx] {
+		if rowA[correctStrIdx] == "no" {
+			return -1
+		} else {
+			return 1
+		}
+	}
+
+	return compareRowNums(rowA, rowB)
+}
+
+func compareRowNums(rowA, rowB table.Row) int {
+	itemNumberIdx := 0
+	numA, _ := strconv.Atoi(rowA[itemNumberIdx])
+	numB, _ := strconv.Atoi(rowB[itemNumberIdx])
+
+	if numA < numB {
+		return -1
+	} else {
+		return 1
+	}
+}
+
+func (_m letterModel) initResultsTable() []table.Row {
 	drill := _m.drill
 
 	j := 1
@@ -254,23 +310,15 @@ func (_m letterModel) initResultsTable() table.Model {
 		j += 1
 	}
 
-	columns := []table.Column{
-		{Title: "#", Width: 3},
-		{Title: "Character", Width: 10},
-		{Title: "Code", Width: 4},
-		{Title: "Correct?", Width: 8},
-		{Title: "Answered", Width: 8},
-	}
+	return rows
+}
 
-	tableStyle := table.DefaultStyles()
-
-	return table.New(
-		table.WithFocused(true),
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithHeight(min(10, len(rows)+1)),
-		table.WithStyles(tableStyle),
-	)
+var letterResultsColumns = []table.Column{
+	{Title: "#", Width: 3},
+	{Title: "Character", Width: 10},
+	{Title: "Code", Width: 4},
+	{Title: "Correct?", Width: 8},
+	{Title: "Answered", Width: 8},
 }
 
 func countCorrectLetters(text string, correct []bool) (int, error) {
@@ -314,7 +362,7 @@ func (_m *letterModel) View() string {
 			"",
 			_m.resultsTable.View(),
 			"",
-			fmt.Sprintf("%v (escape/enter to go back, ctrl+c to exit)", scoreText),
+			fmt.Sprintf("%v (escape/enter to go back, s to toggle sort, ctrl+c to exit)", scoreText),
 			"",
 		)
 	}

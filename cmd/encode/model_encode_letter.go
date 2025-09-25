@@ -2,6 +2,8 @@ package encode
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
 	"sync"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -14,13 +16,15 @@ import (
 )
 
 type letterModel struct {
-	backReference tea.Model
+	backReference    tea.Model
+	wrongRightSorted bool
 
 	drill       *commons.Drill
 	lettersUsed string
 
 	input        textinput.Model
 	resultsTable table.Model
+	rows         []table.Row
 
 	showResults bool
 	score       int
@@ -109,12 +113,15 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if _m.showResults {
 		if key, isKey := msg.(tea.KeyMsg); isKey {
-			if key.String() == "enter" {
+			switch key.String() {
+			case "enter":
 				if _m.backReference == nil {
 					return _m, tea.Quit
 				}
 
 				return _m.backReference, nil
+			case "s":
+				_m.resultsTable = _m.toggleSorted()
 			}
 		}
 
@@ -167,7 +174,10 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if drill.Current >= len(drill.Text) {
 				close(_m.charPlayer)
 
-				_m.resultsTable = _m.initResultsTable()
+				_m.rows = _m.initResultsTable()
+				_m.wrongRightSorted = true
+				_m.resultsTable = _m.toggleSorted()
+
 				_m.score, _ = countCorrectLetters(drill.Text, drill.Correct)
 				_m.showResults = true
 			}
@@ -186,7 +196,7 @@ func (_m *letterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return _m, cmd
 }
 
-func (_m letterModel) initResultsTable() table.Model {
+func (_m letterModel) initResultsTable() []table.Row {
 	drill := _m.drill
 
 	j := 1
@@ -214,22 +224,56 @@ func (_m letterModel) initResultsTable() table.Model {
 		j += 1
 	}
 
-	columns := []table.Column{
-		{Title: "#", Width: 3},
-		{Title: "Character", Width: 10},
-		{Title: "Correct?", Width: 8},
-		{Title: "Answer", Width: 7},
-	}
+	return rows
+}
 
-	tableStyle := table.DefaultStyles()
+var resultsColumns = []table.Column{
+	{Title: "#", Width: 3},
+	{Title: "Character", Width: 10},
+	{Title: "Correct?", Width: 8},
+	{Title: "Answer", Width: 7},
+}
+
+func (_m *letterModel) toggleSorted() table.Model {
+	_m.wrongRightSorted = !_m.wrongRightSorted
+
+	if _m.wrongRightSorted {
+		slices.SortFunc(_m.rows, compareCorrectsThenNums)
+	} else {
+		slices.SortFunc(_m.rows, compareRowNums)
+	}
 
 	return table.New(
 		table.WithFocused(true),
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithHeight(min(10, len(rows)+1)),
-		table.WithStyles(tableStyle),
+		table.WithColumns(resultsColumns),
+		table.WithRows(_m.rows),
+		table.WithHeight(min(10, len(_m.rows)+1)),
 	)
+}
+
+func compareCorrectsThenNums(rowA, rowB table.Row) int {
+	correctStrIdx := 2
+	if rowA[correctStrIdx] != rowB[correctStrIdx] {
+		if rowA[correctStrIdx] == "no" {
+			return -1
+		} else {
+			return 1
+		}
+	}
+
+	return compareRowNums(rowA, rowB)
+}
+
+func compareRowNums(rowA, rowB table.Row) int {
+	itemNumberIdx := 0
+	numA, _ := strconv.Atoi(rowA[itemNumberIdx])
+	numB, _ := strconv.Atoi(rowB[itemNumberIdx])
+
+	if numA < numB {
+		return -1
+	} else {
+		return 1
+	}
 }
 
 func countCorrectLetters(text string, correct []bool) (int, error) {
@@ -273,7 +317,7 @@ func (_m *letterModel) View() string {
 			"",
 			_m.resultsTable.View(),
 			"",
-			fmt.Sprintf("%v (escape/enter to go back, ctrl+c to exit)", scoreText),
+			fmt.Sprintf("%v (escape/enter to go back, s to toggle sort, ctrl+c to exit)", scoreText),
 			"",
 		)
 	}

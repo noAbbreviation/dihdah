@@ -2,6 +2,8 @@ package decode
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,7 +17,8 @@ import (
 )
 
 type wordModel struct {
-	backReference tea.Model
+	backReference    tea.Model
+	wrongRightSorted bool
 
 	drills  *commons.TrainingModel
 	speed   float64
@@ -23,6 +26,7 @@ type wordModel struct {
 
 	input        textinput.Model
 	resultsTable table.Model
+	rows         [][3]table.Row
 
 	userAnswers []string
 	showResults bool
@@ -188,6 +192,8 @@ func (_m *wordModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				_m.killSignal <- struct{}{}
 				return _m.backReference, nil
+			case "s":
+				_m.resultsTable = _m.toggleSorted()
 			}
 		}
 
@@ -244,7 +250,10 @@ func (_m *wordModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 
-				_m.resultsTable = _m.initResultsTable()
+				_m.rows = _m.initResultsTable()
+				_m.wrongRightSorted = true
+				_m.resultsTable = _m.toggleSorted()
+
 				_m.score = correctWords
 				_m.showResults = true
 
@@ -273,10 +282,10 @@ func (_m *wordModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return _m, cmd
 }
 
-func (_m wordModel) initResultsTable() table.Model {
+func (_m wordModel) initResultsTable() [][3]table.Row {
 	drills := _m.drills
 
-	rows := []table.Row{}
+	rows := [][3]table.Row{}
 	maxWordWidth := 4
 	maxUserWordWidth := 5
 
@@ -330,29 +339,78 @@ func (_m wordModel) initResultsTable() table.Model {
 		}
 		paddingRow := table.Row{"", "", "", ""}
 
-		rows = append(
-			rows,
+		groupedRows := [3]table.Row{
 			firstRow,
 			correctionStringRow,
 			paddingRow,
-		)
+		}
+		rows = append(rows, groupedRows)
 	}
 
-	columns := []table.Column{
-		{Title: "#", Width: 3},
-		{Title: "Word", Width: maxWordWidth},
-		{Title: "Correct?", Width: 8},
-		{Title: "Input", Width: maxUserWordWidth},
+	wordResultsColumns[wordWidthIdx].Width = maxWordWidth
+	wordResultsColumns[inputStrIdx].Width = maxWordWidth
+
+	return rows
+}
+
+const (
+	itemNumberIdx int = iota
+	wordWidthIdx
+	correctStrIdx
+	inputStrIdx
+)
+
+var wordResultsColumns = []table.Column{
+	{Title: "#", Width: 3},
+	{Title: "Word"}, // Width: maxWordWidth
+	{Title: "Correct?", Width: 8},
+	{Title: "Input"}, // Width: maxWordWidth
+}
+
+func word_compareCorrectsThenNums(rowA, rowB [3]table.Row) int {
+	correctStrIdx := 2
+	if rowA[0][correctStrIdx] != rowB[0][correctStrIdx] {
+		if rowA[0][correctStrIdx] == "no" {
+			return -1
+		} else {
+			return 1
+		}
 	}
 
-	tableStyle := table.DefaultStyles()
+	return word_compareRowNums(rowA, rowB)
+}
+
+func word_compareRowNums(rowA, rowB [3]table.Row) int {
+	itemNumberIdx := 0
+	numA, _ := strconv.Atoi(rowA[0][itemNumberIdx])
+	numB, _ := strconv.Atoi(rowB[0][itemNumberIdx])
+
+	if numA < numB {
+		return -1
+	} else {
+		return 1
+	}
+}
+
+func (_m *wordModel) toggleSorted() table.Model {
+	_m.wrongRightSorted = !_m.wrongRightSorted
+
+	if _m.wrongRightSorted {
+		slices.SortFunc(_m.rows, word_compareCorrectsThenNums)
+	} else {
+		slices.SortFunc(_m.rows, word_compareRowNums)
+	}
+
+	rows := []table.Row{}
+	for _, r := range _m.rows {
+		rows = append(rows, r[:]...)
+	}
 
 	return table.New(
 		table.WithFocused(true),
-		table.WithColumns(columns),
+		table.WithColumns(wordResultsColumns),
 		table.WithRows(rows),
-		table.WithHeight(min(10, len(rows)+1)),
-		table.WithStyles(tableStyle),
+		table.WithHeight(min(10, len(_m.rows)+1)),
 	)
 }
 
@@ -383,7 +441,7 @@ func (_m *wordModel) View() string {
 			"",
 			_m.resultsTable.View(),
 			"",
-			fmt.Sprintf("%v (escape/enter to go back, ctrl+c to exit)", scoreText),
+			fmt.Sprintf("%v (escape/enter to go back, s to toggle sort, ctrl+c to exit)", scoreText),
 			"",
 		)
 	}
