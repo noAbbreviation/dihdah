@@ -150,8 +150,8 @@ func (m *FilePicker) update(msg tea.Msg) (*FilePicker, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter", " ":
-			m.SelectingFile = true
-			return m, tea.Sequence(m.picker.Init(), tea.EnterAltScreen)
+			cmd := m.TriggerSelection()
+			return m, cmd
 		}
 
 		var cmd tea.Cmd
@@ -159,6 +159,11 @@ func (m *FilePicker) update(msg tea.Msg) (*FilePicker, tea.Cmd) {
 		m.viewport, cmd = m.viewport.Update(msg)
 		return m, cmd
 	}
+}
+
+func (m *FilePicker) TriggerSelection() tea.Cmd {
+	m.SelectingFile = true
+	return tea.Sequence(m.picker.Init(), tea.EnterAltScreen)
 }
 
 func (m *FilePicker) setViewportContent(s string) {

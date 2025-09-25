@@ -70,7 +70,6 @@ func NewNumber(minValue float64, maxValue float64) *Number {
 	}
 }
 
-// Sets to default value
 func (m *Number) Reset() {
 	m.SetValue(m.Default)
 	m.reacted = true

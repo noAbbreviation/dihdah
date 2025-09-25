@@ -469,13 +469,6 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						specialCase = true
 					}
 
-				case *components.FilePicker:
-					switch msg.String() {
-					case "h", "left":
-						updateInput(&cmds, &_m.inputs[focusedIE], msg)
-						specialCase = true
-					}
-
 				case *components.Number:
 					switch msg.String() {
 					case "h", "left":
@@ -563,7 +556,7 @@ func (_m *dihdahModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case *components.FilePicker:
 					switch msg.String() {
 					case "enter", " ", "l", "right":
-						updateInput(&cmds, &_m.inputs[focusedIE], msg)
+						cmds = append(cmds, input.TriggerSelection())
 						specialCase = true
 					}
 
