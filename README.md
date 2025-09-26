@@ -64,5 +64,5 @@ If you have at least Go 1.25, install using the following command:
 go install github.com/noAbbreviation/dihdah
 ```
 
-> [!NOTE]
-> A release may be in the works.
+Alternatively, you can download the binaries in the [Releases](https://github.com/noAbbreviation/dihdah/releases)
+of this repository.
