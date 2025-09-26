@@ -9,10 +9,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var versionString = "[dev build]"
+
 var Cmd = &cobra.Command{
-	Use:   "dihdah",
-	Short: "Drills for learning morse code characters",
-	Long:  ui.RootCmdLong,
+	Use:     "dihdah",
+	Short:   "Drills for learning morse code characters",
+	Version: versionString,
+	Long:    ui.RootCmdLong,
 }
 
 func Execute() {
