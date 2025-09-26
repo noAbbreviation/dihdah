@@ -1,0 +1,60 @@
+name: Build binaries and release
+on:
+  push:
+    tags:
+      - "v*"
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION_STRING: ${{ github.ref_name }}
+      REPO_URL: github.com/noAbbreviation/dihdah
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ">=1.25"
+      - run: go version
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libasound2-dev
+          go get -u .
+          go mod tidy
+      - name: Build For Linux
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          go build -o "dihdah-${GOOS}_${GOARCH}" \
+          -ldflags="-s -X ${REPO_NAME}/cmd.versionString=${VERSION_STRING}" \
+          .
+      - name: Build For MacOS
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+        run: |
+          go build -o "dihdah-${GOOS}_${GOARCH}" \
+          -ldflags="-s -X ${REPO_NAME}/cmd.versionString=${VERSION_STRING}" \
+          .
+      - name: Build For Windows
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          go build -o "dihdah-${GOOS}_${GOARCH}.exe" \
+          -ldflags="-s -X ${REPO_NAME}/cmd.versionString=${VERSION_STRING}" \
+          .
+      - name: Release to Github
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: false
+          make_latest: true
+          name: ${{ github.ref_name }}
+          files: |
+            dihdah-*
